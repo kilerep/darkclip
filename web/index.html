@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0b10">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon.svg">
+<title>DarkClip</title>
+<style>
+:root{--bg:#0b0b10;--card:#15151d;--line:#262633;--txt:#ececf1;--mut:#8b8b9e;--acc:#e5ff00;--red:#c81a1a;--ok:#33d17a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:84px}
+header{position:sticky;top:0;z-index:5;background:rgba(11,11,16,.92);backdrop-filter:blur(8px);padding:14px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+header h1{font-size:19px;margin:0;letter-spacing:.5px}
+header h1 b{color:var(--acc)}
+#status{margin-left:auto;font-size:12px;color:var(--mut)}
+main{padding:16px;max-width:640px;margin:0 auto}
+.tab{display:none}.tab.on{display:block}
+label{display:block;font-size:13px;color:var(--mut);margin:14px 0 6px}
+input,select,textarea{width:100%;background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:inherit;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--acc)}
+textarea{min-height:120px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chk{display:flex;gap:10px;align-items:center;margin-top:12px;color:var(--txt);font-size:14px}
+.chk input{width:22px;height:22px;accent-color:var(--acc)}
+button{font:inherit;border:0;border-radius:12px;padding:14px 16px;cursor:pointer;font-weight:600}
+.primary{width:100%;margin-top:20px;background:var(--acc);color:#111;font-size:16px}
+.primary:disabled{opacity:.5}
+.ghost{background:var(--card);color:var(--txt);border:1px solid var(--line);padding:10px 12px;font-size:13px}
+.or{text-align:center;color:var(--mut);font-size:12px;margin:10px 0}
+.file{display:flex;gap:8px;align-items:center}
+.file input{flex:1}
+.hint{font-size:12px;color:var(--mut);margin-top:6px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#101017;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;color:var(--mut);border-radius:0;padding:12px 4px 14px;font-size:12px;font-weight:500}
+nav button span{display:block;font-size:20px;margin-bottom:2px}
+nav button{min-width:0}
+nav button.on{color:var(--acc)}
+.job{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:14px}
+.job h3{margin:0 0 4px;font-size:15px;word-break:break-word}
+.meta{font-size:12px;color:var(--mut)}
+.bar{height:6px;background:#22222c;border-radius:6px;margin:10px 0 6px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--acc);transition:width .4s}
+.err{color:#ff6b6b;font-size:13px;margin-top:6px}
+.clips{display:grid;gap:14px;margin-top:12px}
+.clip{border-top:1px solid var(--line);padding-top:12px}
+.clip video{width:100%;max-height:70vh;aspect-ratio:9/16;background:#000;border-radius:12px;object-fit:contain}
+.clip .t{font-weight:600;margin:8px 0 2px}
+.score{display:inline-block;background:var(--red);color:#fff;font-size:11px;font-weight:700;border-radius:20px;padding:2px 8px;margin-right:6px}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.rate{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+.chip{font-size:12px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:transparent;color:inherit;cursor:pointer}
+.chip.on,.ghost.on{background:var(--acc);color:#000;border-color:var(--acc)}
+.tplgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:12px}
+.tplgrid img{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:10px;background:#000}
+.vers{margin-top:10px;display:grid;gap:8px}.ver{display:flex;gap:10px;align-items:center}
+.ver img{width:64px;aspect-ratio:9/16;object-fit:cover;border-radius:8px;background:#000}
+.tag{color:var(--acc);font-size:12px}
+details summary{cursor:pointer;color:var(--mut);font-size:13px;margin-top:6px}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#fff;color:#111;padding:10px 16px;border-radius:30px;font-size:14px;opacity:0;transition:.3s;pointer-events:none;z-index:9}
+.toast.on{opacity:1}
+.empty{color:var(--mut);text-align:center;padding:40px 0}
+.editor{margin-top:10px;padding:12px;border:1px dashed var(--line);border-radius:12px}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.md h3,.md h4{margin:14px 0 6px}.md p{margin:6px 0}
+.md .tr{display:grid;grid-template-columns:90px 44px 1fr;gap:6px;border-top:1px solid var(--line);padding:6px 0;font-size:13px}
+.md .tr span:nth-child(4){grid-column:1/-1;color:var(--acc)}
+nav button{font-size:11px}
+.seg button{background:var(--card);color:var(--txt);border:1px solid var(--line);padding:9px 12px;font-size:13px;font-weight:500;border-radius:999px}
+.seg button.on{background:var(--acc);color:#111;border-color:var(--acc);font-weight:700}
+input[type=range]{padding:0;accent-color:var(--acc)}
+.editor .file input{text-align:center;min-width:0;padding:12px 4px}
+.editor .file .ghost{padding:10px 8px;flex:none}
+.row>div,.file input{min-width:0}
+html,body{overflow-x:hidden}
+</style>
+</head>
+<body>
+<header><h1>DARK<b>CLIP</b></h1><div id="status">…</div></header>
+<main>
+  <!-- CLIPAR -->
+  <section class="tab on" id="t-clip">
+    <label>Links dos vídeos (um por linha: YouTube, TikTok, Instagram, TED…)</label>
+    <textarea id="c-url" inputmode="url" style="min-height:70px" placeholder="https://youtube.com/watch?v=..."></textarea>
+    <div class="or">— ou —</div>
+    <div class="file"><input id="c-file" type="file" accept="video/*"></div>
+    <label>O que fazer</label>
+    <div class="seg" id="c-tool">
+      <button data-v="clip" class="on">✂️ Cortes com IA</button><button data-v="legendar">💬 Só legendar</button><button data-v="silencios">🔇 Tirar silêncios</button><button data-v="analisar">🔍 Analisar vídeo</button>
+    </div>
+    <div id="c-cuts">
+    <label>Duração dos cortes</label>
+    <div class="seg" id="c-dur">
+      <button data-v="20-60" class="on">Auto (20–60s)</button><button data-v="15-30">Curtos (15–30s)</button><button data-v="45-90">Longos (45–90s)</button>
+      <button data-v="60-180">Facebook (1–3 min)</button><button data-v="540-960">Podcast (9–16 min)</button><button data-v="custom">Personalizado</button>
+    </div>
+    <div class="row" id="c-custom" style="display:none">
+      <div><label>De (min:seg)</label><input id="c-min" value="0:20"></div>
+      <div><label>Até (min:seg)</label><input id="c-max" value="1:00"></div>
+    </div>
+    <label>Quantidade de cortes: <b id="c-nv">4</b> <span class="hint">(se o vídeo for curto, sai o máximo que couber sem repetir trecho)</span></label>
+    <input id="c-n" type="range" min="1" max="30" value="4" oninput="$('#c-nv').textContent=this.value">
+    </div>
+    <div class="row">
+      <div><label>Proporção</label>
+        <select id="c-aspect"><option value="9:16">9:16 (Shorts/Reels/TikTok)</option><option value="4:5">4:5 (feed)</option><option value="1:1">1:1 (quadrado)</option><option value="original">Original</option></select></div>
+      <div><label>Distância da câmera</label>
+        <select id="c-dist"><option value="padrao">Padrão</option><option value="longe">Mais longe</option></select></div>
+    </div>
+    <label>Enquadramento</label>
+    <select id="c-crop"><option value="auto">Automático ✨</option><option value="track">Seguir rosto</option><option value="split">Tela dividida (2 pessoas)</option><option value="gamer">🎮 Gamer (webcam + jogo)</option><option value="blur">Fundo desfocado</option><option value="center">Corte central</option></select>
+    <details><summary>⏱️ Só um pedaço do vídeo / dividir em partes (lives longas)</summary>
+      <div class="row">
+        <div><label>De (h:mm:ss)</label><input id="c-r0" placeholder="0:00:00"></div>
+        <div><label>Até (h:mm:ss)</label><input id="c-r1" placeholder="fim"></div>
+      </div>
+      <label>Dividir em partes de</label>
+      <select id="c-part"><option value="0">Não dividir</option><option value="15">15 min (cortes de cada parte, em ordem)</option><option value="30">30 min</option><option value="60">1 hora</option></select>
+    </details>
+    <label>O que procurar? (opcional)</label>
+    <input id="c-req" placeholder='ex.: "a parte em que ele fala do acidente"'>
+    <label>🎣 Gancho (o que prende nos primeiros segundos)</label>
+    <select id="c-hookmode"><option value="auto">🤖 Automático (a IA escolhe o melhor para cada corte)</option><option value="previa">⏩ Prévia do melhor momento</option><option value="pergunta">❓ Pergunta</option><option value="espera">⏳ Espera até o fim</option><option value="choque">😱 Afirmação chocante</option><option value="pov">🎬 POV / situação</option><option value="acao">🎮 Começa na ação (sem texto)</option><option value="nenhum">Sem gancho</option></select>
+    <label>Final</label>
+    <select id="c-ending"><option value="auto">🤖 Automático (loop quando o fim emenda bem)</option><option value="loop">🔁 Loop (o fim emenda no começo)</option><option value="normal">⏹️ Normal</option></select>
+    <p class="hint">⏩ Prévia: o corte abre com 2–3 s do momento mais forte e volta ao começo. 🔁 Loop: o fim se dissolve no primeiro quadro, então o replay parece continuação e a pessoa assiste de novo.</p>
+    <label>Nicho do canal (ajuda a IA a escolher)</label>
+    <input id="c-niche" placeholder="ex.: mistérios, true crime, curiosidades, motivação">
+    <label>Idioma das legendas</label>
+    <select id="c-lang"><option value="pt">Português</option><option value="en">Inglês</option><option value="es">Espanhol</option></select>
+    <label>Estilo da legenda</label>
+    <select id="c-style"><option value="amarelo">Amarela (palavra atual)</option><option value="verde">Verde</option><option value="caixa">Caixa vermelha</option><option value="minimal">Minimalista</option><option value="frases">Frases (amarela itálica, 2–4 palavras)</option></select>
+    <label class="chk"><input id="c-caps" type="checkbox" checked> Legenda animada</label>
+    <label class="chk"><input id="c-jump" type="checkbox" checked> Remover silêncios (jump cuts)</label>
+    <label class="chk"><input id="c-zoom" type="checkbox" checked> Zoom de impacto alternado</label>
+    <label class="chk"><input id="c-sfx" type="checkbox" checked> 🔊 Efeitos sonoros (whoosh nos cortes, impacto no gancho)</label>
+    <label class="chk"><input id="c-rz" type="checkbox" checked> 🔍 Zoom no rosto na reação (no modo Gamer: webcam em tela cheia)</label>
+    <label class="chk"><input id="c-grade" type="checkbox" checked> Visual dark (contraste + vinheta)</label>
+    <label class="chk"><input id="c-hook" type="checkbox" checked> Gancho no topo (3 s)</label>
+    <label class="chk"><input id="c-prog" type="checkbox" checked> Barra de progresso</label>
+    <label class="chk"><input id="c-smart" type="checkbox" checked> Download inteligente (só os trechos)</label>
+    <label class="chk"><input id="c-com" type="checkbox" checked> 💬 Analisar comentários e chat do público</label>
+    <label class="chk"><input id="c-vis" type="checkbox" checked> 👁️ Gemini assiste o vídeo (imagem + áudio)</label>
+    <label>Trilha de fundo (opcional)</label>
+    <input id="c-music" type="file" accept="audio/*">
+    <button class="primary" id="c-go">✂️ Gerar Shorts</button>
+    <p class="hint">Use vídeos próprios, com licença Creative Commons ou com autorização. Cortes sem edição/comentário costumam ser desmonetizados como "conteúdo reutilizado".</p>
+  </section>
+
+  <!-- HISTÓRIA DARK -->
+  <section class="tab" id="t-story">
+    <div class="job"><h3>💡 Ideias para hoje</h3>
+      <p class="meta">Mistura o que está em alta no Brasil (Google) com a identidade da sua página.</p>
+      <label>Página / nicho</label><input id="i-niche" placeholder="ex.: Curiosidades e notícias explicadas">
+      <label>3 subtemas (mesma identidade)</label><input id="i-subs" placeholder="ex.: ciência, história, tecnologia">
+      <button class="primary" id="i-go" onclick="genIdeas()">💡 Gerar ideias</button>
+      <div id="i-list" style="margin-top:10px"></div>
+      <details><summary>🔥 Em alta agora no Brasil</summary><div id="i-trends" class="meta"></div></details>
+    </div>
+    <label>Tema (a IA escreve o roteiro)</label>
+    <input id="s-topic" placeholder="ex.: O mistério do Passo Dyatlov">
+    <label>Formato</label>
+    <select id="s-format"><option value="livre">História (mistério, caso real)</option><option value="top5">🏆 Top 5</option>
+      <option value="curiosidades">🤯 3 curiosidades</option><option value="quiz">❓ Quiz (A, B ou C)</option><option value="desafio">🎯 Desafio</option></select>
+    <label>…ou cole seu roteiro pronto</label>
+    <textarea id="s-script" placeholder="Em 1959, nove estudantes entraram nas montanhas…"></textarea>
+    <label>Voz</label>
+    <select id="s-voice"></select>
+    <label>Vídeo de fundo: link (opcional)</label>
+    <input id="s-bg" type="url" placeholder="link de gameplay/paisagem livre de direitos">
+    <div class="or">— ou —</div>
+    <input id="s-bgfile" type="file" accept="video/*">
+    <p class="hint">Sem fundo, o DarkClip gera um fundo preto com grão de filme.</p>
+    <label>Trilha de fundo (opcional)</label>
+    <input id="s-music" type="file" accept="audio/*">
+    <button class="primary" id="s-go">🎙️ Criar Short narrado</button>
+  </section>
+
+  <!-- RESULTADOS -->
+  <section class="tab" id="t-jobs"><div id="jobs"></div></section>
+
+  <!-- CANAL (central) -->
+  <section class="tab" id="t-canal">
+    <div id="cn-due"></div>
+    <div class="job"><h3>📈 Meu canal</h3>
+      <div id="cn-stats" class="meta">Conecte seu canal para ver os números.</div>
+      <div class="file" style="margin-top:10px"><input id="cn-url" placeholder="https://www.youtube.com/@seucanal">
+        <button class="ghost" onclick="cnSave()">Salvar</button></div>
+      <button class="primary" id="cn-sync" onclick="cnSync()">🔄 Atualizar números</button>
+    </div>
+    <div class="job"><h3>🎯 Perfil do canal</h3>
+      <p class="hint">Escreva o que é um bom corte para o seu canal. Vale para todos os clipes, sem precisar repetir no campo de cada vídeo.</p>
+      <textarea id="cn-brief" rows="4" maxlength="800" placeholder="ex.: gameplay de terror, quero reações e momentos de susto, evite partes com a câmera parada e fala sobre configurações"></textarea>
+      <button class="ghost" onclick="cnSaveBrief()">Salvar perfil</button></div>
+    <div class="job"><h3>🎨 Modelos por rede</h3>
+      <p class="hint">O mesmo corte com uma cara diferente em cada rede. Escolha o modelo de cada uma e, em 🎬 Resultados, toque em "🎨 Versões para as redes". Ao postar, cada rede recebe a sua versão.</p>
+      <label>@ do canal (aparece embaixo do vídeo)</label><input id="tp-handle" placeholder="@seucanal">
+      <div id="tp-nets"></div>
+      <label>Imagem de fundo (para o modelo 🖼️ Meu fundo)</label>
+      <div class="file"><input id="tp-bg" type="file" accept="image/*"></div><div id="tp-bgname" class="meta"></div>
+      <button class="primary" onclick="tpSave()">Salvar modelos</button>
+      <div id="tp-prev" class="tplgrid"></div></div>
+    <div class="job"><h3>💰 Caminho da monetização (YouTube)</h3><div id="cn-ypp"></div>
+      <p class="hint">Estimativa. Confira o valor oficial no YouTube Studio → Ganhar dinheiro.</p></div>
+    <div class="job"><h3>🧠 O que funciona no seu canal</h3><div id="cn-ins" class="meta"></div><div id="cn-fb" class="meta" style="margin-top:8px"></div></div>
+    <div class="job"><h3>📅 Próximos posts</h3><div id="cn-up" class="meta"></div>
+      <label>Horários de postagem</label>
+      <div class="file"><input id="cn-slots" placeholder="12:00, 18:00, 21:00"><input id="cn-per" type="number" min="1" max="6" style="max-width:70px" title="por dia">
+        <button class="ghost" onclick="cnSlots()">OK</button></div>
+      <p class="hint">Use "📅 Planejar" em cada clipe na aba Resultados.</p></div>
+    <div class="job"><h3>🏆 Seus Shorts mais vistos</h3><div id="cn-top" class="meta"></div></div>
+    <div class="job"><h3>✅ Já postados</h3><div id="cn-posted" class="meta"></div></div>
+  </section>
+
+  <!-- CONTAS -->
+  <section class="tab" id="t-contas">
+    <div class="job"><h3>🔗 Contas conectadas</h3><div id="ct-list" class="meta">Carregando…</div>
+      <p class="hint">Com a conta conectada, use 📅 Planejar → "automático" e o DarkClip posta sozinho na hora marcada (o PC precisa estar ligado com o DarkClip aberto).</p></div>
+    <div class="job"><h3>📘 Facebook + 📸 Instagram</h3>
+      <p class="meta">Precisa de: Página do Facebook (você admin) e, para o Instagram, conta <b>profissional</b> ligada à Página. Passo a passo: <b>docs/CONTAS.md</b>.</p>
+      <label>ID do app (Meta)</label><input id="ct-app">
+      <label>Chave secreta do app</label><input id="ct-sec" type="password">
+      <label>Token de usuário (Graph API Explorer)</label><input id="ct-tok" type="password">
+      <button class="primary" onclick="ctMeta()">Conectar Facebook/Instagram</button></div>
+    <div class="job"><h3>▶️ YouTube</h3>
+      <p class="meta">⚠️ Regra do Google: sem auditoria do seu projeto, os vídeos enviados pela API ficam <b>privados</b>. O DarkClip envia e você publica no YouTube Studio com 1 toque. Conecte pelo <b>PC</b>.</p>
+      <label>Client ID (OAuth "App para computador")</label><input id="ct-yid">
+      <label>Client secret</label><input id="ct-ysec" type="password">
+      <button class="primary" onclick="ctYT()">Conectar com Google</button></div>
+    <div class="job"><h3>🎵 TikTok · Kwai</h3><p class="meta">Não têm API aberta para postar automaticamente. Use 📤 Postar: abre o app com o vídeo e o texto já copiado.</p></div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section class="tab" id="t-cfg">
+    <label>Endereço do servidor</label>
+    <input id="cfg-api" placeholder="vazio = este mesmo endereço">
+    <label>Token de acesso (DARKCLIP_TOKEN)</label>
+    <input id="cfg-token" type="password">
+    <button class="primary" id="cfg-save">Salvar</button>
+    <div id="cfg-info" class="hint" style="margin-top:16px"></div>
+    <div class="job" style="margin-top:16px"><h3>❓ Problemas comuns</h3>
+      <details><summary>O trabalho ficou parado em "Transcrevendo"</summary><p class="meta">Na primeira vez, o DarkClip baixa o Whisper (~480 MB) e transcreve o áudio. Em vídeo longo leva alguns minutos; a porcentagem aparece em "📜 Ver detalhes". Para ir mais rápido, coloque DARKCLIP_WHISPER_MODEL=base no .env.</p></details>
+      <details><summary>A legenda saiu em inglês</summary><p class="meta">Confira se o idioma da legenda está em Português na aba Clipar. O DarkClip transcreve de novo em português quando o YouTube marca o idioma errado.</p></details>
+      <details><summary>O corte começa sem contexto</summary><p class="meta">Use a duração Longos (45–90s), recue o início no ✏️ Editar e dê 👎 com o motivo "Começa sem contexto": depois de 2 notas assim, o DarkClip passa a recuar mais o começo sozinho.</p></details>
+      <details><summary>A webcam ficou borrada ou cortada</summary><p class="meta">No ✏️ Editar do clipe, troque o enquadramento: 🎮 Gamer (webcam + jogo), Fundo desfocado (mostra a tela inteira) ou Seguir rosto.</p></details>
+      <details><summary>O Gemini não marcou momentos</summary><p class="meta">Veja em "📜 Ver detalhes". Se aparecer "ocupado (503)", o Google estava lotado: o DarkClip tenta outros modelos e depois lê só a transcrição. Rode o verificar_windows.bat para testar a chave.</p></details>
+      <details><summary>O celular não abre o app</summary><p class="meta">O celular precisa estar no mesmo Wi-Fi do PC. Use o endereço com ?token= que aparece na janela preta do DarkClip.</p></details>
+      <details><summary>Quero que o Claude use o DarkClip sozinho</summary><p class="meta">Com o DarkClip aberto, rode na pasta do projeto: claude mcp add darkclip -- python -m darkclip.mcp_server. Depois peça ao Claude: "corta este vídeo em 3 Shorts longos".</p></details>
+      <details><summary>Algo diferente deu errado</summary><p class="meta">Rode o verificar_windows.bat e mande o print da tela para o Claude, junto com o "📜 Ver detalhes" do trabalho.</p></details>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button data-t="clip" class="on"><span>✂️</span>Clipar</button>
+  <button data-t="story"><span>🎙️</span>História</button>
+  <button data-t="jobs"><span>🎬</span>Resultados</button>
+  <button data-t="canal"><span>📅</span>Canal</button>
+  <button data-t="contas"><span>🔗</span>Contas</button>
+  <button data-t="cfg"><span>⚙️</span>Ajustes</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const store = { get(k, d=''){ try{return localStorage.getItem(k) ?? d}catch{return d} }, set(k,v){ try{localStorage.setItem(k,v)}catch{} } };
+let API = store.get('dc_api'), TOKEN = store.get('dc_token');
+{ // endereço com ?token=... (mostrado pelo PC ao iniciar): salva a senha e limpa a barra de endereço
+  const q = new URLSearchParams(location.search).get('token');
+  if (q) { TOKEN = q; store.set('dc_token', q); history.replaceState(null, '', location.pathname); }
+}
+const url = p => (API||'') + p + (TOKEN ? (p.includes('?')?'&':'?') + 'token=' + encodeURIComponent(TOKEN) : '');
+const toast = m => { const t=$('#toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),2200); };
+
+async function api(path, opts={}) {
+  const r = await fetch(url(path), {headers:{'Content-Type':'application/json'}, ...opts});
+  if (!r.ok) { let m = r.status; try { m = (await r.json()).detail } catch {} throw new Error(m); }
+  return r.json();
+}
+function upload(file, label) {
+  return new Promise((res, rej) => {
+    const fd = new FormData(); fd.append('file', file);
+    const x = new XMLHttpRequest(); x.open('POST', url('/api/upload'));
+    x.upload.onprogress = e => e.lengthComputable && ($('#status').textContent = `${label} ${Math.round(e.loaded/e.total*100)}%`);
+    x.onload = () => x.status < 300 ? res(JSON.parse(x.responseText).name) : rej(new Error('upload falhou'));
+    x.onerror = () => rej(new Error('sem conexão'));
+    x.send(fd);
+  });
+}
+
+// navegação
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => show(b.dataset.t));
+function show(t){
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x.dataset.t===t));
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.id==='t-'+t));
+  if (t==='jobs') loadJobs();
+  if (t==='canal') loadCanal();
+  if (t==='contas') loadContas();
+}
+
+async function submit(btn, build) {
+  btn.disabled = true;
+  try { const body = await build(); await api('/api/jobs', {method:'POST', body: JSON.stringify(body)}); toast('Na fila! 🎬'); show('jobs'); }
+  catch(e){ toast('Erro: ' + e.message); }
+  finally { btn.disabled = false; $('#status').textContent=''; }
+}
+
+// segmentos (botões de escolha única)
+const segVal = sel => document.querySelector(sel + ' button.on')?.dataset.v;
+document.querySelectorAll('.seg').forEach(g => g.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  g.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  if (g.id === 'c-dur') $('#c-custom').style.display = b.dataset.v === 'custom' ? '' : 'none';
+  if (g.id === 'c-tool') { const t = b.dataset.v; $('#c-cuts').style.display = t === 'clip' ? '' : 'none';
+    if (t !== 'clip') { $('#c-aspect').value = 'original'; $('#c-caps').checked = t === 'legendar'; $('#c-jump').checked = t === 'silencios'; }
+    $('#c-go').textContent = {clip:'✂️ Gerar cortes', legendar:'💬 Legendar vídeo', silencios:'🔇 Tirar silêncios', analisar:'🔍 Analisar vídeo'}[t]; }
+}));
+const hms = v => { v = (v||'').trim(); if (!v) return 0; return v.split(':').reduce((a, x) => a * 60 + (+x || 0), 0); };
+function durRange(){
+  const v = segVal('#c-dur');
+  if (v === 'custom') return [hms($('#c-min').value), hms($('#c-max').value)];
+  return v.split('-').map(Number);
+}
+
+$('#c-go').onclick = async e => {
+  const btn = e.target; btn.disabled = true;
+  try {
+    const f = $('#c-file').files[0], m = $('#c-music').files[0];
+    const urls = $('#c-url').value.split(/\s+/).filter(u => /^https?:\/\//.test(u));
+    if (!urls.length && !f) throw new Error('cole um link ou escolha um vídeo');
+    const [mn, mx] = durRange();
+    const base = { mode: segVal('#c-tool'), music: m ? await upload(m, 'Enviando trilha') : null,
+      n_clips:+$('#c-n').value, min_s:mn, max_s:mx, aspect:$('#c-aspect').value, distance:$('#c-dist').value,
+      captions:$('#c-caps').checked, range_start:hms($('#c-r0').value), range_end:hms($('#c-r1').value),
+      part_min:+$('#c-part').value,
+      crop:$('#c-crop').value, style:$('#c-style').value, niche:$('#c-niche').value, lang:$('#c-lang').value,
+      jumpcut:$('#c-jump').checked, zoom:$('#c-zoom').checked, sfx:$('#c-sfx').checked, progress:$('#c-prog').checked,
+      smart:$('#c-smart').checked, grade:$('#c-grade').checked, hook:$('#c-hook').checked,
+      comments:$('#c-com').checked, visual:$('#c-vis').checked, request:$('#c-req').value.trim(),
+      hook_mode:$('#c-hookmode').value, ending:$('#c-ending').value,
+      react_zoom:$('#c-rz').checked };
+    const bodies = urls.map(url => ({...base, url}));
+    if (f) bodies.push({...base, upload: await upload(f, 'Enviando vídeo')});
+    for (const b of bodies) await api('/api/jobs', {method:'POST', body: JSON.stringify(b)});
+    toast(bodies.length > 1 ? `${bodies.length} vídeos na fila! 🎬` : 'Na fila! 🎬'); show('jobs');
+  } catch(err){ toast('Erro: ' + err.message); }
+  finally { btn.disabled = false; $('#status').textContent=''; }
+};
+$('#s-go').onclick = e => submit(e.target, async () => {
+  const f = $('#s-bgfile').files[0], m = $('#s-music').files[0];
+  return { mode:'story', formato:$('#s-format').value, topic:$('#s-topic').value, script:$('#s-script').value.trim() || null,
+    voice:$('#s-voice').value, bg_url:$('#s-bg').value.trim() || null,
+    bg_upload: f ? await upload(f, 'Enviando fundo') : null,
+    music: m ? await upload(m, 'Enviando trilha') : null };
+});
+
+// resultados
+let INFO = {}, timer;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function loadJobs(fromTimer){
+  clearTimeout(timer);
+  if (fromTimer === true && OPEN_ED.size) { timer = setTimeout(() => loadJobs(true), 3000); return; }  // não apaga o editor aberto
+  let jobs = [];
+  try { jobs = await api('/api/jobs'); } catch(e){ $('#jobs').innerHTML = `<p class="empty">Sem conexão com o servidor (${esc(e.message)}).<br>Confira em ⚙️ Ajustes.</p>`; return; }
+  if (!jobs.length) { $('#jobs').innerHTML = '<p class="empty">Nenhum trabalho ainda.</p>'; return; }
+  await getTpl();
+  const open = new Set([...document.querySelectorAll('details[open]')].map(d=>d.dataset.k));
+  $('#jobs').innerHTML = jobs.map(jobHTML).join('');
+  document.querySelectorAll('details').forEach(d => open.has(d.dataset.k) && (d.open = true));
+  if (jobs.some(j => j.status==='queued' || j.status==='running' || j.clips.some(c => c.status==='queued' || c.status==='rendering'
+        || Object.values(c.styled||{}).some(v => v.status==='queued' || v.status==='rendering'))))
+    timer = setTimeout(() => loadJobs(true), 3000);
+}
+function jobHTML(j){
+  const p = j.params, icon = {story:'🎙️', analisar:'🔍', legendar:'💬', silencios:'🔇'}[p.mode] || '✂️';
+  const name = p.mode==='story' ? '🎙️ ' + (p.topic || 'Roteiro próprio') : icon + ' ' + (j.source?.title || p.url || p.upload || '');
+  const st = {queued:'Na fila', running:'Processando', done:'Pronto', error:'Erro'}[j.status];
+  return `<div class="job"><h3>${esc(name)}</h3>
+    <div class="meta">${st} · ${new Date(j.created*1000).toLocaleString('pt-BR')}</div>
+    ${j.status!=='done' ? `<div class="bar"><i style="width:${j.progress}%"></i></div><div class="meta">${esc(j.log.at(-1)||'')}</div>` : ''}
+    ${j.error ? `<div class="err">${esc(j.error)}</div>${helpFor(j.error)}` : ''}
+    ${j.source?.has_heatmap ? '<div class="meta">🔥 usando o mapa "mais repetidos" do YouTube</div>' : ''}
+    ${j.source?.comments ? `<div class="meta">💬 ${j.source.comments.total} comentários lidos · ${j.source.comments.mapped} citam momentos</div>` : ''}
+    ${j.engine ? `<div class="meta">Escolhido por: ${({claude:'Claude', gemini:'Gemini', ollama:'Ollama (offline)', heuristica:'regras automáticas'})[j.engine]||j.engine}</div>` : ''}
+    ${j.cost ? `<div class="meta">💰 Custo de IA: US$ ${j.cost.usd.toFixed(3)} (≈ R$ ${j.cost.brl.toFixed(2)})</div>` : ''}
+    ${j.status!=='running' && j.log?.length ? `<details data-k="log-${j.id}"><summary>📜 Ver detalhes (passo a passo)</summary><div class="meta">${j.log.map(l=>`<div>• ${esc(l)}</div>`).join('')}</div></details>` : ''}
+    ${j.analysis ? `<details open data-k="an-${j.id}"><summary>📄 Análise do vídeo (${esc(j.analysis.engine||'')})</summary><div class="md">${md(j.analysis.markdown)}</div></details>` : ''}
+    <div class="clips">${j.clips.map((c,i) => clipHTML(j,c,i)).join('')}</div>
+    <div class="acts">${j.clips.filter(c=>c.file).length>1?`<button class="ghost" onclick="planAll('${j.id}')">📅 Agendar todos</button><button class="ghost" onclick="genVersions('${j.id}')">🎨 Versões de todos</button>`:''}
+      <button class="ghost" onclick="delJob('${j.id}')">🗑️ Apagar</button></div></div>`;
+}
+function clipHTML(j,c,i){
+  const busy = c.status==='queued' || c.status==='rendering';
+  if (!c.file) return `<div class="clip"><div class="t">${c.score!=null?`<span class="score">${c.score}</span>`:''}${esc(c.title)}</div>
+    ${busy ? '<div class="meta">⏳ Renderizando…</div>' : `<div class="err">${esc(c.error||'falhou')}</div>
+    <div class="acts"><button class="ghost" onclick="retry('${j.id}',${i})">🔁 Tentar de novo</button></div>`}</div>`;
+  const v = url(`/files/${j.id}/${c.file}?v=${c.v||0}`), th = url(`/files/${j.id}/${c.thumb}?v=${c.v||0}`);
+  const sg = c.signals || {}, r = c.render || {};
+  const chips = [sg.ai!=null&&`🤖 ${sg.ai}`, sg.heat!=null&&`🔥 ${Math.round(sg.heat*100)}`,
+    sg.comments!=null&&`💬 ${Math.round(sg.comments*100)}`, sg.visual!=null&&`👁️ ${Math.round(sg.visual*100)}`,
+    sg.energy!=null&&`⚡ ${Math.round(sg.energy*100)}`,
+    sg.wpm&&`🗣️ ${sg.wpm} ppm`, r.layout&&({track:'🎯 seguindo rosto',split:'🪟 tela dividida',blur:'🌫️ desfoque'}[r.layout]),
+    r.removed>0&&`✂️ −${r.removed}s silêncio`,
+    c.retention?.hook_type&&({previa:'⏩ prévia',pergunta:'❓ pergunta',espera:'⏳ espera o fim',choque:'😱 chocante',pov:'🎬 POV',acao:'🎮 ação',texto:'🎣 gancho',nenhum:''}[c.retention.hook_type]),
+    c.retention?.loop&&'🔁 loop'].filter(Boolean);
+  return `<div class="clip">
+    ${busy ? '<div class="meta">⏳ Re-renderizando…</div>' : `<video src="${v}" poster="${th}" controls playsinline preload="none"></video>`}
+    <div class="t">${c.score!=null?`<span class="score">${c.score}</span>`:''}${esc(c.title)}</div>
+    <div class="meta">${c.duration}s${c.start!=null?` · original ${fmt(c.start)}–${fmt(c.end)}`:''}</div>
+    ${chips.length?`<div class="meta">${chips.join(' · ')}</div>`:''}
+    ${c.grades?`<div class="meta">Gancho ${c.grades.hook} · Fluxo ${c.grades.flow} · Valor ${c.grades.value} · Tendência ${c.grades.trend}</div>`:''}
+    ${c.error?`<div class="err">${esc(c.error)}</div>${helpFor(c.error)}`:''}
+    <div class="tag">${esc((c.hashtags||[]).join(' '))}</div>
+    <details data-k="${j.id}-${i}"><summary>Descrição${c.reason?' / por que viraliza':''}</summary>
+      <p>${esc(c.description)}</p>${c.reason?`<p class="meta">💡 ${esc(c.reason)}</p>`:''}${c.script?`<p class="meta">${esc(c.script)}</p>`:''}</details>
+    <div class="acts">
+      <button class="ghost" onclick="share('${j.id}',${i})">📤 Postar</button>
+      <a class="ghost" style="text-decoration:none;border-radius:12px" href="${url(`/files/${j.id}/${c.file}?dl=1`)}" download>⬇️ Baixar</a>
+      <button class="ghost" onclick="copyMeta('${j.id}',${i})">📋 Copiar texto</button>
+      ${INFO.postiz?`<button class="ghost" onclick="pub('${j.id}',${i})">🚀 Agendar (Postiz)</button>`:''}
+      ${c.start!=null?`<button class="ghost" onclick="toggleEd('${j.id}',${i})">✏️ Editar</button>`:''}
+      <button class="ghost" onclick="planClip('${j.id}',${i})">📅 Planejar</button>
+    </div>${rateHTML(j,c,i)}${versionsHTML(j,c,i)}${c.start!=null?editorHTML(j,c,i):''}</div>`;
+}
+function editorHTML(j,c,i){
+  const e = {...j.params, ...(c.edit||{})}, id = `ed-${j.id}-${i}`;
+  const opt = (v,l,cur) => `<option value="${v}" ${v===cur?'selected':''}>${l}</option>`;
+  return `<div class="editor" id="${id}" style="display:${OPEN_ED.has(id)?'block':'none'}">
+    <div class="row">
+      <div><label>Início (s)</label><div class="file"><button class="ghost" onclick="nudge('${id}','s',-1)">−1</button><input data-f="start" type="number" step="0.1" value="${c.start}"><button class="ghost" onclick="nudge('${id}','s',1)">+1</button></div></div>
+      <div><label>Fim (s)</label><div class="file"><button class="ghost" onclick="nudge('${id}','e',-1)">−1</button><input data-f="end" type="number" step="0.1" value="${c.end}"><button class="ghost" onclick="nudge('${id}','e',1)">+1</button></div></div>
+    </div>
+    <label>Texto do gancho (deixe como está para o automático escolher)</label><input data-f="hook" data-orig="${esc(c.retention?.hook||c.retention?.teaser_text||c.hook||'')}" value="${esc(c.retention?.hook||c.retention?.teaser_text||c.hook||'')}">
+    <label>Título</label><input data-f="title" value="${esc(c.title||'')}">
+    <label>Palavras em destaque (vírgula)</label><input data-f="emphasis" value="${esc((c.emphasis||[]).join(', '))}">
+    <div class="row">
+      <div><label>Enquadramento</label><select data-f="crop">${[['auto','Automático'],['track','Seguir rosto'],['split','Tela dividida'],['gamer','Gamer'],['blur','Desfoque'],['center','Central']].map(([v,l])=>opt(v,l,e.crop||'auto')).join('')}</select></div>
+      <div><label>Legenda</label><select data-f="style">${[['amarelo','Amarela'],['verde','Verde'],['caixa','Caixa'],['minimal','Minimal'],['frases','Frases']].map(([v,l])=>opt(v,l,e.style||'amarelo')).join('')}</select></div>
+    </div>
+    <div class="row">
+      <div><label>🎣 Gancho</label><select data-f="hook_mode">${[['auto','Automático'],['previa','⏩ Prévia'],['pergunta','❓ Pergunta'],['espera','⏳ Espera'],['choque','😱 Chocante'],['pov','🎬 POV'],['acao','🎮 Ação'],['nenhum','Sem gancho']].map(([v,l])=>opt(v,l,e.hook_mode||'auto')).join('')}</select></div>
+      <div><label>Final</label><select data-f="ending">${[['auto','Automático'],['loop','🔁 Loop'],['normal','Normal']].map(([v,l])=>opt(v,l,e.ending||'auto')).join('')}</select></div>
+    </div>
+    <label class="chk"><input data-f="jumpcut" type="checkbox" ${e.jumpcut!==false?'checked':''}> Remover silêncios</label>
+    <label class="chk"><input data-f="zoom" type="checkbox" ${e.zoom!==false?'checked':''}> Zoom de impacto</label>
+    <label class="chk"><input data-f="react_zoom" type="checkbox" ${e.react_zoom!==false?'checked':''}> 🔍 Zoom no rosto na reação</label>
+    <button class="primary" onclick="saveEd('${j.id}',${i})">🔁 Re-renderizar</button>
+  </div>`;
+}
+const fmt = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+const getClip = async (jid,i) => (await api('/api/jobs/'+jid)).clips[i];
+const metaText = c => `${c.title}\n\n${c.description}\n\n${(c.hashtags||[]).join(' ')}`;
+async function copyMeta(jid,i){ const c = await getClip(jid,i); try { await navigator.clipboard.writeText(metaText(c)); toast('Texto copiado'); } catch { prompt('Copie:', metaText(c)); } }
+async function share(jid,i,fname){
+  const c = await getClip(jid,i);
+  fname = fname || c.file;
+  try {
+    const blob = await (await fetch(url(`/files/${jid}/${fname}`))).blob();
+    const file = new File([blob], fname, {type:'video/mp4'});
+    try { await navigator.clipboard.writeText(metaText(c)); } catch {}
+    if (navigator.canShare && navigator.canShare({files:[file]})) {
+      await navigator.share({files:[file], title:c.title, text:metaText(c)});
+    } else { location.href = url(`/files/${jid}/${fname}?dl=1`); toast('Baixando — compartilhe pela galeria'); }
+  } catch(e){ if (e.name!=='AbortError') toast('Erro: '+e.message); }
+}
+async function pub(jid,i){
+  const c = await getClip(jid,i);
+  const when = prompt('Data/hora UTC (AAAA-MM-DDTHH:MM:SSZ) — vazio = agora', '');
+  if (when === null) return;
+  try { await api(`/api/jobs/${jid}/clips/${i}/publish`, {method:'POST', body: JSON.stringify({title:c.title, description:c.description, hashtags:c.hashtags||[], when: when||null})}); toast('Agendado no YouTube ✅'); }
+  catch(e){ toast('Erro: '+e.message); }
+}
+const OPEN_ED = new Set();
+function toggleEd(jid,i){ const id=`ed-${jid}-${i}`, el=document.getElementById(id); const on = el.style.display==='none';
+  el.style.display = on?'block':'none'; on ? OPEN_ED.add(id) : OPEN_ED.delete(id); if (on) clearTimeout(timer); }
+function nudge(id,which,d){ const el=document.querySelector(`#${CSS.escape(id)} [data-f=${which==='s'?'start':'end'}]`); el.value=(+el.value+d).toFixed(1); }
+async function saveEd(jid,i){
+  const id=`ed-${jid}-${i}`, root=document.getElementById(id), body={};
+  root.querySelectorAll('[data-f]').forEach(el => {
+    if (el.dataset.orig !== undefined && el.value === el.dataset.orig) return;  // não mexeu: não envia
+    const k=el.dataset.f; body[k] = el.type==='checkbox' ? el.checked : el.type==='number' ? +el.value
+      : k==='emphasis' ? el.value.split(',').map(x=>x.trim()).filter(Boolean) : el.value; });
+  try { await api(`/api/jobs/${jid}/clips/${i}/edit`, {method:'POST', body: JSON.stringify(body)}); OPEN_ED.delete(id); toast('Re-renderizando…'); loadJobs(); }
+  catch(e){ toast('Erro: '+e.message); }
+}
+// ---------- 💡 Como resolver os erros mais comuns
+const HELP = [
+  [/verificação|not a bot|Sign in to confirm/i, 'O YouTube pediu verificação de robô. Rode o install_windows.bat de novo (atualiza o yt-dlp). Se continuar, configure os cookies do navegador (DARKCLIP_COOKIES no .env, veja o README).'],
+  [/limitou pedidos|429/i, 'O YouTube limitou os pedidos. Espere uns 10 minutos e tente de novo.'],
+  [/503|ocupado|high demand|indisponível agora/i, 'O Google estava lotado. O DarkClip já tenta de novo e troca de modelo sozinho; os cortes saem mesmo assim. Se quiser a análise do Gemini, tente de novo em alguns minutos.'],
+  [/private video|vídeo privado|video unavailable|removed|removido|age-restricted|confirm your age|restrição de idade/i, 'O vídeo é privado, foi removido ou tem restrição de idade ou região. Tente outro link ou envie o arquivo do vídeo.'],
+  [/faster-whisper|Whisper/i, 'Falta o transcritor (faster-whisper). Rode o verificar_windows.bat e mande o print para o Claude.'],
+  [/ffmpeg/i, 'O ffmpeg falhou. Rode o verificar_windows.bat e mande o print para o Claude.'],
+  [/Token inválido|401/i, 'Senha do app errada. Em ⚙️ Ajustes, use o token que aparece na janela preta do DarkClip.'],
+  [/curto demais/i, 'O começo e o fim ficaram muito perto. No ✏️ Editar, aumente o fim ou recue o início.'],
+  [/sem fala|fala suficiente/i, 'Esse trecho quase não tem fala. Escolha outro intervalo ou um vídeo com narração.'],
+  [/No space|espaço/i, 'O disco está cheio. Apague trabalhos antigos na aba Resultados.'],
+  [/Sem IA de texto/i, 'Para a IA escrever o roteiro, coloque a chave do Gemini ou do Claude no arquivo .env. Ou cole um roteiro pronto.'],
+];
+function helpFor(err){ const h = err && HELP.find(([re]) => re.test(err)); return h ? `<div class="meta">💡 ${h[1]}</div>` : ''; }
+
+// ---------- 🎨 Modelos visuais e versões por rede
+let TP = null;
+const NETS = {tiktok:'🎵 TikTok', youtube:'▶️ YouTube Shorts', instagram:'📸 Instagram', facebook:'📘 Facebook', kwai:'🟠 Kwai'};
+const NET_ICON = {tiktok:'🎵', youtube:'▶️', instagram:'📸', facebook:'📘', kwai:'🟠'};
+async function getTpl(force){ if (!TP || force) { try { TP = await api('/api/templates'); } catch { TP = null; } } return TP; }
+async function loadTpl(){
+  const t = await getTpl(true); if (!t) return;
+  $('#tp-handle').value = t.handle ? '@' + t.handle : '';
+  $('#tp-nets').innerHTML = t.platforms.map(p => `<label>${NETS[p]||p}</label><select data-net="${p}">${t.catalog.map(c =>
+    `<option value="${c.id}" ${t.by_platform[p]===c.id?'selected':''}>${esc(c.nome)}</option>`).join('')}</select>`).join('');
+  $('#tp-bgname').textContent = t.bg_image ? '✅ Fundo atual: ' + t.bg_image : 'Nenhuma imagem enviada (o modelo usa o desfoque do vídeo).';
+  const v = Date.now();
+  $('#tp-prev').innerHTML = t.catalog.map(c => `<div><img loading="lazy" alt="" src="${url(`/api/templates/${c.id}/preview.jpg?v=${v}`)}">
+    <div class="t" style="font-size:13px">${esc(c.nome)}</div><div class="meta" style="font-size:11px">${esc(c.desc)}</div></div>`).join('');
+}
+async function tpSave(){
+  try {
+    const templates = {}; document.querySelectorAll('#tp-nets select').forEach(s => templates[s.dataset.net] = s.value);
+    const body = {templates, handle: $('#tp-handle').value};
+    const f = $('#tp-bg').files[0];
+    if (f) { toast('Enviando imagem…'); body.bg_image = await upload(f, 'Imagem'); $('#tp-bg').value = ''; }
+    await api('/api/central/brand', {method:'POST', body: JSON.stringify(body)});
+    toast('Modelos salvos ✅'); loadTpl();
+  } catch(e){ toast('Erro: ' + e.message); }
+}
+function versionsHTML(j,c,i){
+  if (!c.file || c.status==='queued' || c.status==='rendering') return '';
+  const st = c.styled || {}, names = Object.keys(st);
+  const nome = id => ((TP?.catalog||[]).find(t => t.id===id) || {}).nome || id;
+  const redes = id => TP ? TP.platforms.filter(p => TP.by_platform[p]===id).map(p => NET_ICON[p]).join(' ') : '';
+  const rows = names.map(n => { const v = st[n];
+    if (v.status==='done') return `<div class="ver"><a href="${url(`/files/${j.id}/${v.file}`)}" target="_blank"><img alt="" src="${url(`/files/${j.id}/${v.thumb}?v=${v.v||0}`)}"></a>
+      <div><div class="t" style="font-size:13px;margin:0">${esc(nome(n))} <span class="meta">${redes(n)}</span></div>
+      <div class="acts" style="margin-top:6px"><a class="ghost" style="text-decoration:none;border-radius:12px" href="${url(`/files/${j.id}/${v.file}?dl=1`)}" download>⬇️ Baixar</a>
+      <button class="ghost" onclick="share('${j.id}',${i},'${v.file}')">📤 Postar</button></div></div></div>`;
+    if (v.status==='error') return `<div class="err">${esc(nome(n))}: ${esc(v.error||'falhou')}</div>${helpFor(v.error)}`;
+    return `<div class="meta">⏳ ${esc(nome(n))}: gerando…</div>`; }).join('');
+  return `<div class="vers"><div><button class="ghost" onclick="genVersions('${j.id}',${i})">🎨 ${names.length?'Gerar versões de novo':'Versões para as redes'}</button></div>${rows}</div>`;
+}
+async function genVersions(jid,i){
+  try { const r = await api(i==null ? `/api/jobs/${jid}/styled` : `/api/jobs/${jid}/clips/${i}/styled`, {method:'POST', body:'{}'});
+        const n = i==null ? r.queued.flat().length : r.queued.length;
+        toast(n ? `🎨 Gerando ${n} versão(ões)…` : 'Todas as redes usam a tela cheia: escolha modelos na aba 📅 Canal.'); loadJobs(); }
+  catch(e){ toast('Erro: '+e.message); }
+}
+
+// ---------- 👍/👎 notas dos clipes (o DarkClip aprende o seu gosto)
+const GOOD_R = ['Boa reação','Engraçado','Gancho forte','Bem editado','História completa'];
+const BAD_R = ['Começa sem contexto','Termina antes do fim','Sem graça','Enquadramento ruim','Legenda errada','Muito longo','Muito curto'];
+function rateHTML(j,c,i){
+  const r = c.rating||0, k = `'${j.id}',${i}`;
+  const chips = r ? (r>0?GOOD_R:BAD_R).map(x=>`<button class="chip ${x===c.rating_reason?'on':''}" onclick="rateClip(${k},${r},'${x}')">${x}</button>`).join('') : '';
+  return `<div class="rate"><span class="meta">Gostou?</span>
+    <button class="ghost ${r===1?'on':''}" onclick="rateClip(${k},${r===1?0:1})">👍</button>
+    <button class="ghost ${r===-1?'on':''}" onclick="rateClip(${k},${r===-1?0:-1})">👎</button>
+    ${r?`${chips}<input class="chip" style="min-width:140px" placeholder="outro motivo…" value="${esc(GOOD_R.concat(BAD_R).includes(c.rating_reason)?'':(c.rating_reason||''))}" onchange="rateClip(${k},${r},this.value)">`:''}</div>`;
+}
+async function rateClip(jid,i,rating,reason=''){
+  try { await api(`/api/jobs/${jid}/clips/${i}/rate`,{method:'POST',body:JSON.stringify({rating,reason})});
+        toast(rating? (reason?'Motivo salvo ✅':'Nota salva: escolha um motivo 👇') : 'Nota apagada'); loadJobs(); }
+  catch(e){ toast('Erro: '+e.message); }
+}
+async function retry(jid,i){
+  try { await api(`/api/jobs/${jid}/clips/${i}/edit`, {method:'POST', body:'{}'}); toast('Tentando de novo…'); loadJobs(); }
+  catch(e){ toast('Erro: '+e.message); }
+}
+// ---------- 📅 Central do Canal
+const nf = n => n==null ? '—' : Number(n).toLocaleString('pt-BR');
+const when = iso => iso ? new Date(iso).toLocaleString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+const bar = (v,max,label) => `<div class="meta">${label}: <b>${nf(v)}</b> / ${nf(max)}</div><div class="bar"><i style="width:${Math.min(100,(v||0)/max*100)}%"></i></div>`;
+let CN = null, cnTimer;
+async function loadCanal(){
+  clearTimeout(cnTimer);
+  if (!loadCanal.tpl) { loadCanal.tpl = true; loadTpl(); }
+  try { ACCS = (await api('/api/contas')).accounts; } catch {}
+  try { CN = await api('/api/central'); } catch(e){ $('#cn-stats').textContent = 'Erro: '+e.message; return; }
+  const st = CN.stats;
+  if (CN.channel) $('#cn-url').value = CN.channel.url;
+  $('#cn-brief').value = CN.settings.brief || '';
+  api('/api/feedback').then(f => { $('#cn-fb').innerHTML = f.total
+    ? `👍 ${f.good} · 👎 ${f.bad} notas suas.` + (f.top_reasons.length?` Mais citados: ${f.top_reasons.map(([k,v])=>`${esc(k)} (${v})`).join(', ')}.`:'') + ' A IA usa essas notas como exemplo do seu gosto.'
+    : 'Dê 👍 ou 👎 nos clipes (aba Resultados) para a IA aprender o seu gosto.'; }).catch(()=>{});
+  $('#cn-slots').value = (CN.settings.slots||[]).join(', '); $('#cn-per').value = CN.settings.per_day||2;
+  $('#cn-stats').innerHTML = st.synced ? `<b>${esc(st.name||'')}</b><br>👥 ${nf(st.subscribers)} inscritos${st.subs_growth!=null?` (${st.subs_growth>=0?'+':''}${nf(st.subs_growth)} no período)`:''} · 🎬 ${nf(st.shorts)} Shorts<br>Atualizado: ${when(st.synced)}`
+    : (CN.channel ? 'Toque em "Atualizar números".' : 'Cole o link do seu canal e salve.');
+  if (CN.sync.running) { $('#cn-stats').innerHTML += '<br>⏳ Atualizando… (pode levar alguns minutos)'; cnTimer = setTimeout(loadCanal, 4000); }
+  if (CN.sync.error) $('#cn-stats').innerHTML += `<div class="err">${esc(CN.sync.error)}</div>`;
+  $('#cn-sync').disabled = CN.sync.running;
+  $('#cn-ypp').innerHTML = bar(st.subscribers, CN.ypp.subs, '👥 Inscritos') + bar(st.views_90d, CN.ypp.views, '👁️ Views de Shorts (90 dias)');
+  $('#cn-ins').innerHTML = CN.insights.map(t => `<p>${esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')}</p>`).join('');
+  const row = (p, due) => `<div class="clip"><div class="t">${due?'⏰ ':''}${esc(p.title)}</div>
+    <div class="meta">${when(p.planned_at)} · ${esc(accName(p.account) || p.platform)}${p.auto?' · 🤖 automático':''}${p.status==='enviando'?' · ⏳ enviando…':''}${p.stats?.views!=null?` · 👁️ ${nf(p.stats.views)} · 👍 ${nf(p.stats.likes)}`:''}</div>
+    ${p.error?`<div class="err">${esc(p.error)}</div>`:''}${p.note?`<div class="meta">ℹ️ ${esc(p.note)}</div>`:''}
+    <div class="acts">${p.status==='planejado'||p.status==='erro'?`${p.account?`<button class="ghost" onclick="cnPublish('${p.id}')">🚀 Postar agora</button>`:''}<button class="ghost" onclick="share('${p.job}',${p.clip})">📤 Postar</button>
+      <button class="ghost" onclick="cnDone('${p.id}')">✅ Postei</button>
+      <button class="ghost" onclick="cnMove('${p.id}')">🕒 Mudar horário</button>`:
+      (p.url?`<a class="ghost" style="text-decoration:none;border-radius:12px" href="${esc(p.url)}" target="_blank">🔗 Ver</a>`:`<button class="ghost" onclick="cnLink('${p.id}')">🔗 Colar link</button>`)}
+      <button class="ghost" onclick="cnDel('${p.id}')">🗑️</button></div></div>`;
+  $('#cn-due').innerHTML = CN.due.length ? `<div class="job" style="border-color:var(--acc)"><h3>⏰ Hora de postar!</h3>${CN.due.map(p=>row(p,true)).join('')}</div>` : '';
+  const up = CN.upcoming.filter(p => !CN.due.some(d=>d.id===p.id));
+  $('#cn-up').innerHTML = up.length ? up.map(p=>row(p)).join('') : 'Nada planejado. Próximo horário livre: ' + when(CN.next_slot);
+  $('#cn-posted').innerHTML = CN.posted.length ? CN.posted.map(p=>row(p)).join('') : 'Nenhum ainda.';
+  $('#cn-top').innerHTML = CN.top.length ? CN.top.map(v => `<p>👁️ ${nf(v.views)} — <a href="${esc(v.url)}" target="_blank" style="color:var(--txt)">${esc(v.title)}</a></p>`).join('') : '—';
+}
+async function cnSave(){ await api('/api/central/channel',{method:'POST',body:JSON.stringify({url:$('#cn-url').value.trim()})}); toast('Canal salvo'); cnSync(); }
+async function cnSync(){ try { await api('/api/central/sync',{method:'POST'}); toast('Atualizando…'); loadCanal(); } catch(e){ toast('Erro: '+e.message); } }
+async function cnSaveBrief(){ await api('/api/central/channel',{method:'POST',body:JSON.stringify({url:'',brief:$('#cn-brief').value})}); toast('Perfil salvo'); }
+async function cnSlots(){ const slots=$('#cn-slots').value.split(/[,; ]+/).filter(x=>/^\d{1,2}:\d{2}$/.test(x)).map(x=>x.padStart(5,'0'));
+  await api('/api/central/channel',{method:'POST',body:JSON.stringify({url:'',slots,per_day:+$('#cn-per').value||slots.length})}); toast('Horários salvos'); loadCanal(); }
+async function cnPost(id, body){ await api('/api/central/posts/'+id,{method:'POST',body:JSON.stringify(body)}); loadCanal(); }
+async function cnDone(id){ const u = prompt('Link do Short publicado (opcional — se deixar vazio, o DarkClip acha pelo título ao atualizar):',''); if (u===null) return; cnPost(id,{status:'postado', url:u.trim()||null}); toast('Marcado como postado ✅'); }
+async function cnLink(id){ const u = prompt('Cole o link do Short:'); if (u) cnPost(id,{url:u.trim()}); }
+async function cnMove(id){ const p = CN.upcoming.find(x=>x.id===id); const v = prompt('Nova data e hora (AAAA-MM-DD HH:MM):', (p?.planned_at||'').replace('T',' ')); if (v) cnPost(id,{planned_at:v.trim().replace(' ','T')}); }
+async function cnDel(id){ if (confirm('Remover do calendário?')) { await api('/api/central/posts/'+id,{method:'DELETE'}); loadCanal(); } }
+async function planClip(jid,i){
+  let next=''; try { next = (await api('/api/central')).next_slot; } catch {}
+  const v = prompt('Quando postar? (AAAA-MM-DD HH:MM) — sugerido o próximo horário livre:', next.replace('T',' '));
+  if (v===null) return;
+  let accs = []; try { accs = (await api('/api/contas')).accounts; } catch {}
+  const opts = [...accs.map(a => `${a.network}: ${a.name}`), 'tiktok (manual)', 'kwai (manual)', 'youtube (manual)'];
+  const k = prompt('Onde postar? Digite o número:\n' + opts.map((o,n)=>`${n+1}. ${o}`).join('\n'), '1'); if (k===null) return;
+  const sel = Math.max(0, Math.min(opts.length-1, (+k||1)-1));
+  const acc = accs[sel] || null, plat = acc ? acc.network : opts[sel].split(' ')[0];
+  const auto = acc ? confirm('Postar AUTOMATICAMENTE na hora marcada? (OK = sim, Cancelar = eu posto)') : false;
+  try { await api('/api/central/plan',{method:'POST',body:JSON.stringify({job:jid, clip:i, when:v.trim().replace(' ','T')||null, platform:plat, account:acc?acc.id:null, auto})}); toast(auto?'Agendado 🤖':'Planejado 📅'); }
+  catch(e){ toast('Erro: '+e.message); }
+}
+
+// ---------- 🔗 Contas
+let ACCS = [];
+const accName = id => { const a = ACCS.find(x => x.id === id); return a ? `${a.network}: ${a.name}` : ''; };
+async function loadContas(){
+  try { ACCS = (await api('/api/contas')).accounts; } catch(e){ $('#ct-list').textContent = 'Erro: '+e.message; return; }
+  const ico = {facebook:'📘', instagram:'📸', youtube:'▶️'};
+  $('#ct-list').innerHTML = ACCS.length ? ACCS.map(a => `<div class="clip"><div class="t">${ico[a.network]||''} ${esc(a.name)}</div>
+    <div class="meta">${a.network}${a.page?' · ligado à página '+esc(a.page):''}</div>
+    <div class="acts"><button class="ghost" onclick="ctDel('${a.id}')">Remover</button></div></div>`).join('') : 'Nenhuma conta conectada ainda.';
+}
+async function ctMeta(){
+  try { await api('/api/contas/meta',{method:'POST',body:JSON.stringify({app_id:$('#ct-app').value, app_secret:$('#ct-sec').value, user_token:$('#ct-tok').value})});
+    $('#ct-tok').value=''; toast('Facebook/Instagram conectados ✅'); loadContas(); } catch(e){ toast('Erro: '+e.message); }
+}
+async function ctYT(){
+  try { const r = await api('/api/contas/youtube',{method:'POST',body:JSON.stringify({client_id:$('#ct-yid').value, client_secret:$('#ct-ysec').value})});
+    window.open(r.auth_url, '_blank'); toast('Autorize na janela do Google e volte aqui'); setTimeout(loadContas, 15000); } catch(e){ toast('Erro: '+e.message); }
+}
+async function ctDel(id){ if (confirm('Remover esta conta?')) { await api('/api/contas/'+encodeURIComponent(id),{method:'DELETE'}); loadContas(); } }
+async function cnPublish(id){ try { await api(`/api/central/posts/${id}/publish`,{method:'POST'}); toast('Enviando… 🚀'); setTimeout(loadCanal, 2000); } catch(e){ toast('Erro: '+e.message); } }
+// markdown simples (títulos, negrito, listas, tabelas)
+function md(t){
+  return (t||'').split('\n').map(l => {
+    const x = esc(l).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+    if (l.startsWith('# ')) return `<h3>${x.slice(2)}</h3>`;
+    if (l.startsWith('## ')) return `<h4>${x.slice(3)}</h4>`;
+    if (l.startsWith('- ')) return `<div>• ${x.slice(2)}</div>`;
+    if (/^\|[-| ]+\|$/.test(l)) return '';
+    if (l.startsWith('|')) return `<div class="tr">${x.split('|').slice(1,-1).map(c=>`<span>${c.trim()}</span>`).join('')}</div>`;
+    return x ? `<p>${x}</p>` : '';
+  }).join('');
+}
+
+// ---------- 💾 Lembra suas escolhas do Clipar (caixinhas e listas) entre uma vez e outra
+(() => {
+  const ids = ['c-caps','c-jump','c-zoom','c-sfx','c-grade','c-hook','c-prog','c-smart','c-com','c-vis',
+               'c-aspect','c-dist','c-crop','c-lang','c-style','c-hookmode','c-ending','c-rz'];
+  for (const id of ids) {
+    const el = document.getElementById(id); if (!el) continue;
+    const v = store.get('dc_f_' + id, null);
+    if (v !== null) { if (el.type === 'checkbox') el.checked = v === '1'; else el.value = v; }
+    el.addEventListener('change', () => store.set('dc_f_' + id, el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value));
+  }
+})();
+
+// ---------- 💡 Ideias
+try { $('#i-niche').value = store.get('dc_niche'); $('#i-subs').value = store.get('dc_subs'); } catch {}
+let IDEAS = [];
+async function genIdeas(){
+  const btn = $('#i-go'); btn.disabled = true; btn.textContent = '⏳ Pensando…';
+  store.set('dc_niche', $('#i-niche').value); store.set('dc_subs', $('#i-subs').value);
+  try {
+    const r = await api('/api/ideas', {method:'POST', body: JSON.stringify({niche:$('#i-niche').value,
+      subthemes:$('#i-subs').value.split(',').map(x=>x.trim()).filter(Boolean), n:10})});
+    IDEAS = r.ideas;
+    $('#i-list').innerHTML = (r.engine==='modelos' ? '<p class="hint">Sem IA de texto configurada: ideias por modelo. Com Claude ou Ollama as ideias ficam sob medida.</p>' : '') +
+      IDEAS.map((x,k) => `<div class="clip"><div class="t">${esc(x.title)}</div>
+        ${x.hook?`<div class="meta">🎣 ${esc(x.hook)}</div>`:''}${x.angle?`<div class="meta">💡 ${esc(x.angle)}</div>`:''}
+        <div class="meta">${esc(x.format)}${x.subtheme?' · '+esc(x.subtheme):''}${x.trend?' · 🔥 '+esc(x.trend):''}</div>
+        ${x.risk?`<div class="err">⚠️ ${esc(x.risk)}</div>`:''}
+        <div class="acts"><button class="ghost" onclick="useIdea(${k})">Usar →</button></div></div>`).join('');
+    $('#i-trends').innerHTML = r.trends.map(t => `<p>🔥 <b>${esc(t.topic)}</b> (${esc(t.traffic)}) — ${esc(t.news[0]?.title||'')}</p>`).join('') || (r.error ? esc(r.error) : '—');
+  } catch(e){ toast('Erro: '+e.message); }
+  finally { btn.disabled = false; btn.textContent = '💡 Gerar ideias'; }
+}
+function useIdea(k){
+  const x = IDEAS[k];
+  $('#s-topic').value = `${x.title}${x.angle ? ' — ' + x.angle : ''}`;
+  $('#s-topic').scrollIntoView({behavior:'smooth', block:'center'}); toast('Tema preenchido: agora é só criar o Short');
+}
+
+async function planAll(jid){
+  let accs = []; try { accs = (await api('/api/contas')).accounts; } catch {}
+  const opts = [...accs.map(a => `${a.network}: ${a.name}`), 'youtube (manual)', 'tiktok (manual)', 'kwai (manual)'];
+  const k = prompt('Agendar TODOS os cortes (melhores primeiro). Onde postar? Digite o número:\n' + opts.map((o,n)=>`${n+1}. ${o}`).join('\n'), '1'); if (k===null) return;
+  const sel = Math.max(0, Math.min(opts.length-1, (+k||1)-1)), acc = accs[sel] || null;
+  const h = prompt('De quantas em quantas horas? (vazio = usar os horários da aba Canal)', '12'); if (h===null) return;
+  const nota = prompt('Só cortes com nota a partir de (0 = todos):', '70'); if (nota===null) return;
+  const auto = acc ? confirm('Postar AUTOMATICAMENTE? (OK = sim, Cancelar = eu posto)') : false;
+  try { const r = await api('/api/central/plan_all',{method:'POST',body:JSON.stringify({job:jid, account:acc?acc.id:null,
+      platform: acc?acc.network:opts[sel].split(' ')[0], auto, every_hours: +h||null, min_score:+nota||0})});
+    toast(`${r.length} cortes agendados 📅`); } catch(e){ toast('Erro: '+e.message); }
+}
+
+async function delJob(jid){ if (confirm('Apagar este trabalho e seus vídeos?')) { await api('/api/jobs/'+jid, {method:'DELETE'}); loadJobs(); } }
+
+// ajustes
+$('#cfg-api').value = API; $('#cfg-token').value = TOKEN;
+$('#cfg-save').onclick = () => { API = $('#cfg-api').value.trim().replace(/\/$/,''); TOKEN = $('#cfg-token').value.trim();
+  store.set('dc_api', API); store.set('dc_token', TOKEN); toast('Salvo'); init(); };
+
+async function init(){
+  try {
+    INFO = await api('/api/info');
+    $('#status').textContent = [INFO.claude&&'Claude', INFO.ollama&&'Ollama', INFO.gemini&&'Gemini'].filter(Boolean).join(' + ') ? '● ' + [INFO.claude&&'Claude', INFO.ollama&&'Ollama', INFO.gemini&&'Gemini'].filter(Boolean).join(' + ') : '● modo heurístico';
+    $('#s-voice').innerHTML = Object.entries(INFO.voices).map(([k,v]) => `<option value="${k}">${v}</option>`).join('');
+    $('#cfg-info').innerHTML = `IA de decisão: ${INFO.claude ? INFO.model : 'sem chave do Claude'}<br>IA de vídeo: ${INFO.gemini ? INFO.gemini_model : 'sem chave do Gemini'}<br>Postiz: ${INFO.postiz ? 'configurado' : 'não configurado'}<br>Fila: ${INFO.queue}`;
+  } catch(e){ $('#status').textContent = '● offline'; $('#cfg-info').textContent = 'Não conectou: ' + e.message; }
+}
+init();
+api('/api/central').then(c => { if (c.due.length) { const b=document.querySelector('nav button[data-t=canal] span'); b.textContent='⏰'; toast(`Hora de postar: ${c.due.length} Short(s)!`); } }).catch(()=>{});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+yt-dlp[default]>=2026.10.26
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+httpx>=0.27                  # postagem automática (Facebook, Instagram, YouTube)
+anthropic>=2.12
+edge-tts>=7.3
+# opcionais
+opencv-python-headless<5     # enquadramento "Seguir rosto" (OpenCV 5 removeu o Haar cascade)
+faster-whisper>=1.1          # transcrição local de vídeos sem legenda (Facebook, TikTok, Kwai, arquivos)
