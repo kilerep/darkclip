@@ -1,0 +1,9 @@
+data/
+.env
+.venv/
+__pycache__/
+*.pyc
+.env.bak
+*.zip
+.claude/settings.local.json
+figurinhas/
