@@ -60,6 +60,14 @@ Fábrica de cortes (Shorts/Reels/TikTok/Kwai/Facebook) com IA, em português do 
 - `docs/GUIA_DO_SISTEMA.md`: o que cada aba e função faz. Atualize quando mudar a interface.
 - `docs/GANCHOS.md`: tipos de gancho e final, como o DarkClip escolhe, e o que a pesquisa diz.
 - `docs/IDEIAS_ENGENHARIA.md` e `docs/ESTUDO_EDICAO.md`: ideias estudadas (REA, Cut.Pro público) e referências de edição.
+- `docs/CONVERSAS_GEMINI.md`: conversas com o Gemini sobre o DarkClip, sempre separando **o que ele viu no código ou nas imagens** do que é **opinião** dele, e marcando cada número como medido, convenção ou chute.
+
+## Como melhorar a edição (pedido do dono)
+Depois de cada mudança na edição de vídeo, não pare no "funcionou":
+1. Renderize um clipe de verdade e **olhe os quadros** (`ffmpeg -i clip.mp4 -vf "fps=1,scale=180:-2,tile=6x4" -frames:v 1 grade.png`).
+2. Meça o que der para medir (posição em pixels, dB, duração) em vez de confiar no olho ou no palpite de uma IA.
+3. Leve os quadros ao Gemini (skill `/consultar-gemini` ou a conversa no navegador), peça crítica da edição e **ferramentas concretas**, não conceitos.
+4. Registre em `docs/CONVERSAS_GEMINI.md` o que foi medido, o que foi aplicado e o que ficou de fora e por quê — inclusive quando a sugestão da IA se mostrar errada.
 
 ## Próximos passos (ROADMAP)
 0. **Cortes de live em lotes** (Kick/Twitch/YouTube ao vivo): confirmar se o yt-dlp detecta a live da Kick antes de construir.

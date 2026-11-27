@@ -55,6 +55,9 @@ def main() -> None:
                    help="legendar = legenda no vídeo inteiro; silencios = tira as pausas do vídeo inteiro")
     c.add_argument("--lang", default="pt")
     c.add_argument("--niche", default="")
+    c.add_argument("--jogo", default="", metavar="ID",
+                   help="🎮 modo por jogo (darkclip/jogos/ID.md). Vazio = descobrir sozinho pelo "
+                        "título e pela fala; 'nenhum' = não usar")
     c.add_argument("--no-grade", action="store_true")
     c.add_argument("--no-hook", action="store_true")
     c.add_argument("--music", help="trilha de fundo (mp3)")
@@ -85,7 +88,8 @@ def main() -> None:
                       style=a.style, jumpcut=not a.no_jumpcut, zoom=not a.no_zoom, progress=not a.no_progress,
                       smart=not a.full, request=a.pedido, comments=not a.no_comments, visual=not a.no_visual,
                       aspect=a.aspect or ("9:16" if a.ferramenta == "clip" else "original"), distance=a.distancia, range_start=_hms(a.de), range_end=_hms(a.ate),
-                      part_min=a.partes, captions=not a.sem_legenda, sfx=not a.sem_efeitos)
+                      part_min=a.partes, captions=not a.sem_legenda, sfx=not a.sem_efeitos,
+                      jogo=a.jogo)
         params["mode"] = a.ferramenta
     else:
         params = dict(mode="story", topic=a.topic, script=a.script, voice=a.voice, bg_url=a.bg_url,
