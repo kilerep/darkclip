@@ -33,11 +33,14 @@ DARK_GRADE = "eq=contrast=1.08:brightness=-0.04:saturation=0.8,vignette=angle=PI
 # ------------------------------------------------------------------ estilos de legenda
 # cores ASS = &HAABBGGRR
 STYLES = {
-    "amarelo": {"size": 84, "hl": "&H0000E5FF&", "emph": "&H0066FF33&", "upper": True, "words": 3, "chars": 16,
+    # chars 18: com 16 a maioria dos blocos virava uma palavra só em português
+    # ("DINHEIRO, DINHEIRO," já tem 19 caracteres) e o destaque não tinha o que destacar.
+    # 20 foi medido e quebra em duas linhas no pior caso; 18 cabe sempre em uma (máx. 865 px de 960).
+    "amarelo": {"size": 84, "hl": "&H0000E5FF&", "emph": "&H0066FF33&", "upper": True, "words": 3, "chars": 18,
                 "bord": 7, "pill": False},
-    "verde":   {"size": 84, "hl": "&H0066FF00&", "emph": "&H0000E5FF&", "upper": True, "words": 3, "chars": 16,
+    "verde":   {"size": 84, "hl": "&H0066FF00&", "emph": "&H0000E5FF&", "upper": True, "words": 3, "chars": 18,
                 "bord": 7, "pill": False},
-    "caixa":   {"size": 80, "hl": "&H00FFFFFF&", "emph": "&H0000E5FF&", "upper": True, "words": 3, "chars": 16,
+    "caixa":   {"size": 80, "hl": "&H00FFFFFF&", "emph": "&H0000E5FF&", "upper": True, "words": 3, "chars": 18,
                 "bord": 6, "pill": True},
     "minimal": {"size": 66, "hl": None, "emph": "&H0000E5FF&", "upper": False, "words": 5, "chars": 26,
                 "bord": 4, "pill": False},
@@ -123,7 +126,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     if st["pill"]:
                         parts.append(f"{{\\3c&H001A1AC8&\\bord16\\shad0}}{txt}{{\\r}}")
                     else:
-                        parts.append(f"{{\\c{st['hl']}\\fscx110\\fscy110}}{txt}{{\\r}}")
+                        # só cor: aumentar a palavra ativa (\fscx) faria o libass recalcular a linha
+                        # e empurrar as palavras vizinhas até 15 px a cada troca de destaque (tremor).
+                        parts.append(f"{{\\c{st['hl']}}}{txt}{{\\r}}")
                 elif is_emph:
                     parts.append(f"{{\\c{st['emph']}}}{txt}{{\\r}}")
                 else:
