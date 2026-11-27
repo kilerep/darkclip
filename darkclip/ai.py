@@ -140,6 +140,104 @@ def _ask_json(prompt: str | list, schema: dict, max_tokens: int = 16000) -> dict
     return json.loads(text)
 
 
+# ---------------------------------------------------------------- fronteiras do corte
+# Muleta de abertura: trecho que só tem isso no começo é enrolação, não gancho.
+FILLER = {"e", "mas", "então", "entao", "aí", "ai", "tipo", "né", "ne", "ah", "ahn", "hum", "uhm",
+          "bom", "bem", "olha", "assim", "cara", "mano", "velho", "eh", "é", "uh", "um", "hã", "ha",
+          "so", "well", "like", "okay", "ok"}
+
+
+def _clean(text: str) -> str:
+    return re.sub(r"\(.*?\)|\[.*?\]|♪", "", text or "").strip()
+
+
+def _trim_opening(segs: list[dict], start: float, end: float, min_s: float) -> float:
+    """Tira a enrolação do começo: pula o primeiro trecho quando ele é só muleta
+    ("ah, então...", "tipo assim") e ainda sobra clipe suficiente. Nunca mexe no fim."""
+    for _ in range(3):   # no máximo 3 trechos de enrolação seguidos
+        idx = [k for k, s in enumerate(segs) if s["end"] > start + 0.05 and s["start"] < end]
+        if not idx:
+            return start
+        first = segs[idx[0]]
+        words = [w.lower().strip(".,!?;:\"'…") for w in _clean(first["text"]).split()]
+        words = [w for w in words if w]
+        if not words or len(words) > 4 or not all(w in FILLER for w in words):
+            return start
+        if end - first["end"] < min_s:      # cortar isso deixaria o clipe curto demais
+            return start
+        start = round(first["end"], 2)
+    return start
+
+
+def _extend_tail(energy: list[float] | None, start: float, end: float, limit: float,
+                 segs: list[dict] | None = None,
+                 hop: float = 0.5, look: float = 3.0, rise: float = 5.0, fall: float = 2.0) -> float:
+    """Não corta em cima do desfecho sonoro: se logo depois do fim ainda há um pico de som
+    (risada, grito, impacto) acima da mediana DO PRÓPRIO CORTE, estende até o som cair.
+    Só aumenta o fim, nunca diminui, e respeita `limit`.
+
+    rise=5 dB é o mesmo limiar que `reacoes.py` usa para achar reação. Medido num vídeo de ação
+    real (15 janelas de 25 s): com 3 dB dispara em 14 delas (qualquer barulho serve), com 5 dB em 6
+    (média +1,25 s) e com 8 dB em nenhuma.
+
+    Pico que é FALA NOVA (uma frase que começa depois do fim) não conta: quem termina a frase em
+    curso é `_finish_sentence`. Sem essa trava, medido no mesmo vídeo, os 6 disparos eram todos
+    frase seguinte, e o corte crescia uma frase por vez em vez de pegar a reação.
+    """
+    if not energy or limit <= end:
+        return end
+    a, b = int(start / hop), int(end / hop)
+    win = energy[a:b]
+    if len(win) < 4:
+        return end
+    med = sorted(win)[len(win) // 2]
+    stop = min(len(energy), int(min(limit, end + look) / hop))
+    nova_fala = [(s["start"], s["end"]) for s in (segs or []) if s["start"] > end + 0.3]
+    last = max((i for i in range(b, stop)
+                if energy[i] - med >= rise
+                and not any(a0 <= i * hop < b0 for a0, b0 in nova_fala)), default=None)
+    if last is None:
+        return end
+    hard = min(len(energy), int(min(limit, end + look + 2.0) / hop))
+    j = last
+    while j < hard and energy[j] - med > fall:
+        j += 1
+    return round(min((j + 1) * hop + 0.2, limit), 2)
+
+
+def _finish_sentence(segs: list[dict], end: float, limit: float, fwd: float = 4.0) -> float:
+    """Termina a frase em curso em vez de cortar no meio dela (vale para os dois motores)."""
+    idx = [k for k, s in enumerate(segs) if s["start"] < end <= s["end"] + 0.5]
+    b = idx[-1] if idx else None
+    if b is None:
+        return end
+    while (b + 1 < len(segs) and not segs[b]["text"].rstrip().endswith(_ENDS)
+           and segs[b + 1]["start"] - segs[b]["end"] < 1.2
+           and segs[b + 1]["end"] - end <= fwd and segs[b + 1]["end"] <= limit):
+        b += 1
+    return round(max(end, min(segs[b]["end"] + 0.25, limit)), 2)
+
+
+def refine_edges(segs: list[dict], start: float, end: float, energy: list[float] | None,
+                 min_s: float, max_s: float) -> tuple[float, float, dict]:
+    """Ajusta as duas bordas do corte com os sinais reais, depois que o motor escolheu o trecho.
+
+    Começo: tira a enrolação. Fim: termina a frase e não corta em cima de um pico de som.
+    Devolve (início, fim, o que mudou) — o fim nunca encurta.
+    """
+    limit = start + max_s + 8
+    s0, e0 = start, end
+    start = _trim_opening(segs, start, end, min_s)
+    end = _finish_sentence(segs, end, limit)
+    end = max(end, _extend_tail(energy, start, end, limit, segs))
+    mudou = {}
+    if abs(start - s0) > 0.05:
+        mudou["abertura"] = round(start - s0, 2)
+    if abs(end - e0) > 0.05:
+        mudou["desfecho"] = round(end - e0, 2)
+    return start, end, mudou
+
+
 def _snap(segs: list[dict], start: float, end: float) -> tuple[float, float]:
     """Ajusta início/fim para bordas de frase (não corta palavra no meio)."""
     starts = [s["start"] for s in segs]
@@ -182,6 +280,19 @@ def select_clips(segs: list[dict], n: int = 5, min_s: int = 20, max_s: int = 58,
         clips, engine = _from_visual(segs, visual, n, min_s, max_s), "gemini"
     if clips is None:
         clips = _select_heuristic(segs, n, min_s, max_s, title, heatmap, energy, comments, request)
+    # refino das fronteiras: vale para todos os motores, depois que o trecho já foi escolhido
+    ordem = sorted(clips, key=lambda c: c["start"])
+    for i, c in enumerate(ordem):
+        try:
+            s, e, mudou = refine_edges(segs, c["start"], c["end"], energy, min_s, max_s)
+            if i + 1 < len(ordem):          # não invade o corte seguinte
+                e = min(e, ordem[i + 1]["start"])
+            if e - s >= min_s * 0.6:
+                c["start"], c["end"] = s, e
+                if mudou:
+                    c["edges"] = mudou
+        except Exception as err:            # borda é opcional: nunca derruba o job
+            print(f"[ai] refino de bordas falhou ({err}); usando o trecho original.")
     for c in clips:  # nota final = IA + sinais reais do público e do áudio
         heat = signals.heat_at(heatmap, c["start"], c["end"])
         en = signals.energy_score(energy, c["start"], c["end"])

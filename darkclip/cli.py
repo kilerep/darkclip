@@ -12,7 +12,7 @@ import shutil
 from pathlib import Path
 
 from . import config
-from .pipeline import Job, run
+from .pipeline import Job, run, safe_print
 
 
 def _hms(v: str) -> float:
@@ -92,11 +92,12 @@ def main() -> None:
                       bg_upload=stash(a.bg_file), music=stash(a.music))
     job = Job.create(params)
     run(job)
-    print(f"\nResultados em: {job.dir}")
+    safe_print(f"\nResultados em: {job.dir}")
     for cl in job.data["clips"]:
         r = cl.get("render", {})
-        print(f" • {cl.get('file', 'ERRO')}  [{cl.get('score')}]  {cl['title']}  "
-              f"{r.get('layout', '')} {r.get('duration', '')}s cortes={r.get('cuts', '')} {cl.get('error', '')}")
+        # safe_print: o título vem da IA e pode trazer emoji, que o terminal do Windows não escreve
+        safe_print(f" • {cl.get('file', 'ERRO')}  [{cl.get('score')}]  {cl['title']}  "
+                   f"{r.get('layout', '')} {r.get('duration', '')}s cortes={r.get('cuts', '')} {cl.get('error', '')}")
 
 
 if __name__ == "__main__":

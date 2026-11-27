@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -20,6 +21,26 @@ from . import ai, config, render, signals, transcribe
 from .download import download, download_audio, download_section, fetch_transcript_only, probe_duration
 
 MARGIN = 4.0  # segundos extras baixados antes/depois de cada trecho (permite ajustes no editor)
+
+
+def safe_print(msg: str) -> None:
+    """Mostra a mensagem sem nunca derrubar o job.
+
+    No Windows o terminal costuma estar em cp1252, que não tem emoji: imprimir "🧠" levantava
+    UnicodeEncodeError e o job inteiro morria, perdendo a transcrição que já estava pronta.
+    Aqui o que o terminal não souber escrever vira "?" e o trabalho continua.
+    """
+    try:
+        print(msg)
+    except UnicodeEncodeError:
+        enc = getattr(sys.stdout, "encoding", None) or "ascii"
+        try:
+            print(msg.encode(enc, "replace").decode(enc, "replace"))
+        except Exception:
+            pass
+    except Exception:
+        pass
+
 
 
 class Job:
@@ -55,7 +76,7 @@ class Job:
         self.save()
 
     def step(self, msg: str, progress: int | None = None) -> None:
-        print(config.redact(f"[{self.id}] {msg}"))
+        safe_print(config.redact(f"[{self.id}] {msg}"))
         self.data["log"].append(msg)
         self.data["log"] = self.data["log"][-60:]
         if progress is not None:
