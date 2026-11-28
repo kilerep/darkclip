@@ -572,3 +572,422 @@ em curso é trabalho do `_finish_sentence`. Depois da trava, nas mesmas 15 janel
 trecho inteiro, e os trechos da transcrição são frases ("Aí, entendeu?"), não muletas isoladas.
 Para aparar a muleta **dentro** da primeira frase seria preciso tempo por palavra na seleção, que
 hoje só existe depois, na hora de montar a legenda. Fica como ideia, não como coisa feita.
+
+---
+
+## 2026-11-27 — Frente 6: normalização de termos e gírias de jogo
+
+Melhoria nº 2 da lista de impacto/esforço do Gemini. Antes das perguntas, foi enviado a ele o que
+já havia sido feito, incluindo **duas correções ao que ele tinha dito**: o estilo `caixa` nunca
+teve tremor (contorno não mexe no espaçamento do libass), e o `_select_heuristic` do repositório
+já somava energia do áudio — o trecho que eu tinha colado estava desatualizado, então a suposição
+dele de que o fallback estava cego para picos não verbais era falsa.
+
+Código enviado: `transcribe.transcribe()`, `transcribe.slice_words()` e `pipeline._caption_words()`.
+
+### B) Recomendação dele (não há fato novo de código nesta parte)
+
+1. **Dois pontos, não um.** Uma camada de normalização com duas saídas:
+   - para o **prompt** e os sinais (`annotate_transcript`), normaliza para a forma canônica, podendo
+     até expandir sinônimos;
+   - para a **legenda** (`_caption_words` → `build_ass`), corrige só com alta confiança, preservando
+     pontuação, caixa e ritmo.
+   Risco de corrigir cedo demais num lugar só: perde-se o registro literal do que foi dito, e o
+   `emphasis` que a IA devolve pode deixar de casar com a grafia da legenda. Risco de corrigir tarde
+   demais: o prompt continua recebendo a transcrição suja e escolhe pior.
+
+2. **Contra falso positivo:** nunca trocar palavra ambígua sem contexto (mina, kill, bot, mato,
+   base, rush, drop, safe, bait); exigir janela de 3 a 5 palavras em volta para os ambíguos
+   ("plantar a mina" sim, "aquela mina" não); lista de bloqueio de palavras portuguesas comuns que
+   o fuzzy nunca pode tocar; e só ligar a correção agressiva quando houver contexto de jogo.
+
+3. **Como o Whisper erra** (ele marca como suposição): com `lang='pt'` tende a puxar o termo em
+   inglês para algo familiar ao português — clutch virando "clasch", "cluth" ou "cuts"; nerf virando
+   "nerfe"; gg virando "je je"; headshot virando "red shot". O inverso também acontece. Por isso:
+   comparação exata só para erros já observados, regex com `\b` para siglas e expressões
+   ("\bgg\b", "\bone\s*tap\b"), e fuzzy apenas como etapa secundária.
+
+4. **Limites do fuzzy** (todos chute dele): até 4 caracteres, **não usar fuzzy** — uma edição muda
+   quase tudo; de 5 a 7, distância máxima 1 (ou similaridade ≥ 0,80); de 8 em diante, distância
+   máxima 2 (similaridade ≥ 0,78).
+
+5. **Arquivo:** um `gamer_ptbr.json` geral mais arquivos opcionais por jogo
+   (`games/valorant.json`, `games/cs.json`), mesclados em tempo de execução com o específico tendo
+   prioridade. JSON porque é da biblioteca padrão, versiona bem no git e valida com schema.
+   Separar `exact_and_regex` (com `context_any` opcional) de `fuzzy` (com `min_len` e `max_dist`).
+
+6. **`initial_prompt` do Whisper:** ajuda, mas não substitui a correção depois. O prompt inicial é
+   limitado (ele cita ~224 tokens no Whisper), então uma lista grande é truncada ou diluída. E tem
+   risco real de **alucinação**: enchendo o prompt de gíria, o modelo força esses termos mesmo
+   quando o locutor disse outra coisa, principalmente em áudio ruim. Recomendação: prompt curto, uma
+   ou duas frases de contexto, mais a normalização depois.
+
+7. **Núcleo do dicionário** (35 termos, chute dele, sem medição de frequência): clutch, one tap,
+   headshot, spray, rush/rushar, drop/dropar, bait/baitar, smoke/smokar, flash/flashar,
+   peek/peekar, wallbang, eco, save/salvar, retake, ace, flick, aimbot, wallhack, lag/lagado, fps,
+   ping, tilt/tiltar/tiltado, nerf/nerfar, buff/buffar, meta, build, farm/farmar, gank/gankar,
+   kite/kitar, aggro, cooldown, respawn, hitbox, gg, ez.
+
+### Observação de quem conduziu
+
+A lista dos 35 termos é a **grafia certa** deles, não os erros que o Whisper comete. Um dicionário
+de correção precisa do par errado → certo, e **esse lado ninguém mediu**: os exemplos de erro que
+ele deu ("clasch", "cuts", "je je") são suposição declarada dele, não observação.
+
+O vídeo de teste que existe em disco é de ação, não de gameplay com gíria pesada, então o ganho
+real não dá para medir com o que temos. Antes de escrever o dicionário, o passo honesto é rodar o
+Whisper num vídeo de gameplay BR de verdade e **anotar os erros que ele realmente comete**. Sem
+isso, o dicionário vira uma lista de palpites que pode estragar fala normal — exatamente o risco
+que ele mesmo descreve na pergunta 2.
+
+### Medição: o que o Whisper erra de verdade num gameplay BR (2026-11-27)
+
+O dicionário de 35 termos do Gemini foi testado contra um vídeo real, antes de virar código.
+
+**Vídeo:** "ROUBANDO O CARRO MAIS RÁPIDO DO GTA 6 NO STEALTH", do canal Rholter Plays,
+13 min 12 s, sem legenda no YouTube — portanto transcrito pelo faster-whisper, que é o caminho que
+o dicionário corrigiria. O vídeo inteiro foi transcrito, 1.806 palavras.
+
+#### Quantos dos 35 termos apareceram
+
+**Dois.** `stealth` (6 vezes) e `sniper` (2 vezes). Os outros 33 não aparecem nenhuma vez.
+(`ace` e `miss` deram falso positivo na busca: eram "Acessar" e "missões".)
+
+**E os dois que apareceram, o Whisper acertou todas as vezes**, inclusive a maiúscula:
+"vamos tentar fazer isso tudo no Stealth", "Nós temos aqui uma Sniper Silenciada".
+
+Ou seja: aplicado a este vídeo, o dicionário proposto teria corrigido **zero** palavras.
+
+#### O que o Whisper errou de verdade
+
+Os erros existem e são muitos, mas são de outra natureza:
+
+| o que saiu | o que era | tipo |
+|---|---|---|
+| "é um Emerus Burble Drank" | nome do carro no GTA | **nome próprio do jogo** |
+| "você pegar caos da rua" | "carros da rua" | palavra comum trocada |
+| "um trecho aqui que não terão farpado" | "que não tem arame farpado" | fala corrida mal segmentada |
+| "tem um mostcando ele na frente" | — | fala corrida, ininteligível |
+| "pulpare falou" | — | fala corrida, ininteligível |
+| "vai no cia, vai no cia" | — | fala corrida |
+| "seguei o stealth no final" | "segurei o stealth" | verbo cortado |
+| "eu já matei em geral" | "matei geral" | palavra inventada |
+
+Três categorias, e só uma delas é dicionário:
+
+1. **Nome próprio do jogo** (carro, arma, lugar, personagem) — aqui um dicionário ajuda, e é
+   por jogo, como o Gemini sugeriu. Mas o conteúdo não tem nada a ver com a lista dele.
+2. **Palavra comum trocada por outra parecida** ("caos" por "carros") — dicionário não resolve:
+   "caos" é palavra portuguesa legítima, trocar sempre estragaria fala normal.
+3. **Fala corrida mal segmentada** — a maior parte. Precisa de modelo melhor ou `initial_prompt`,
+   não de tabela de substituição.
+
+#### Conclusão
+
+A melhoria nº 2 da lista do Gemini, **do jeito que ele a descreveu, não se sustenta neste material**.
+A premissa dele era que a transcrição "erra constantemente nomes de armas, habilidades, mapas,
+gírias gamer e anglicismos (clutch, nerf, buff, drop, flash, smoke, ranked, bot, tilt, GG)". Num
+gameplay BR de verdade, esses termos simplesmente não foram ditos — é um vocabulário de FPS
+competitivo, e o canal joga GTA.
+
+Isso não mata a ideia, muda o alvo: um dicionário de **nomes próprios por jogo** (os carros e
+armas do GTA, por exemplo) tem caso de uso real e verificado. Já a lista de gíria genérica seria
+código morto, com risco de estragar fala normal.
+
+Ressalva honesta: um vídeo só, de um canal só, de um jogo só. Num canal de Valorant ou CS o
+resultado pode ser o oposto. Antes de descartar de vez, valeria medir o mesmo num vídeo de FPS
+competitivo.
+
+#### Dois tropeços de ambiente encontrados no caminho
+
+1. `download._ytdlp()` cai em `["python3", "-m", "yt_dlp"]` quando não acha o executável `yt-dlp`
+   no PATH. No Windows, `python3` bate no atalho da Microsoft Store e o job morre com
+   "Python não foi encontrado; executar sem argumentos para instalar do Microsoft Store".
+   Usar `sys.executable` em vez de `python3` resolveria. **Não corrigido**, só registrado.
+2. Rodando pela linha de comando sem ativar o `.venv`, o `yt-dlp` não está no PATH e cai nesse
+   mesmo caminho. Com `.venv\Scripts` no PATH, funciona.
+
+---
+
+## 2026-11-27 — Modo por jogo (🎮), começando pelo GTA
+
+Em vez do dicionário de gíria que a medição derrubou, foi feito o que o dado sustenta: um modo por
+jogo, em que o DarkClip reconhece de que jogo é o vídeo e lê um arquivo de aprendizagem sobre ele
+antes de escolher os cortes.
+
+### Como funciona
+
+- `darkclip/jogos/<id>.md` é o arquivo de aprendizagem, em português, editável à mão. Para ensinar
+  um jogo novo basta copiar `gta.md`, trocar o conteúdo e salvar com outro nome — **não precisa
+  mexer em código**. Três seções, marcadas com `## `:
+  `Reconhecer por` (uma palavra por linha), `Vocabulário` (nomes próprios) e `Como clipar`
+  (texto livre, vai inteiro para o pedido da IA).
+- `darkclip/jogos.py` lê os arquivos, descobre o jogo e monta o bloco do prompt.
+- A detecção pontua acerto no título com peso 3 e na fala com peso 1, exige 3 pontos no mínimo, e
+  olha só os 60 primeiros trechos da transcrição.
+- `ai.select_clips(..., game=..., on_game=...)` chama a detecção e avisa no log do job.
+  `game=""` descobre sozinho, `game="nenhum"` desliga, `game="gta"` força.
+- Na CLI: `--jogo gta` ou `--jogo nenhum`.
+- Tudo em `try/except`: arquivo faltando ou torto não derruba o job.
+
+### Conferido
+
+| caso | resultado |
+|---|---|
+| vídeo real, título + fala | gta, 10 pontos |
+| só a fala, sem título | gta, 4 pontos |
+| só o título | gta |
+| vídeo de mistério (não é jogo) | nenhum jogo |
+| `--jogo nenhum` | desligado |
+| `--jogo gta` forçado num vídeo qualquer | ligado, "escolhido na mão" |
+| `--jogo minecraft` (não existe) | segue sem modo, avisando quais jogos existem |
+
+O bloco que entra no prompt tem 3.047 caracteres. Sem jogo reconhecido, é string vazia.
+
+Foi escrita e depois **removida** uma função `para_whisper()`, que montaria um `initial_prompt`
+com o vocabulário do jogo. Motivo: nada a usava, e a medição do dia mostrou que o Whisper já
+acerta `stealth` e `sniper` — o risco de alucinação que o próprio Gemini descreveu não se paga.
+
+### Rodada completa no vídeo de GTA
+
+`python -m darkclip.cli clip "https://youtu.be/vNKRehuCQys" -n 2 --min 20 --max 45 --style amarelo
+--no-visual --no-comments`
+
+O log mostrou "🎮 Modo GTA ligado (reconhecido pelo título)". O Gemini escolheu dois trechos:
+
+| corte | trecho | nota | render |
+|---|---|---|---|
+| 1 | 11:07, "Fugindo da polícia com o carro mais rápido do GTA 6" | 90 | **1,1 s — quebrado** |
+| 2 | 2:38, "O momento em que o plano stealth quase falhou" | 86 | 19,8 s, ok |
+
+Os dois títulos são de cena, não de fala — o que é o efeito esperado do arquivo de aprendizagem.
+
+---
+
+## 2026-11-27 — Bug encontrado: o áudio dos trechos baixados vem truncado
+
+O corte 1 acima saiu com 1,1 s. A investigação levou a um bug que **não tem nada a ver com o modo
+de jogo** e que já existia antes.
+
+**O que acontece:** o download por trecho (`--download-sections`) às vezes entrega um arquivo cujo
+**fluxo de áudio é mais curto que o de vídeo**.
+
+| arquivo | vídeo | áudio |
+|---|---|---|
+| job de 27/11, clip_01_src.mp4 | 41 s | **5 s** |
+| job de 27/11, clip_02_src.mp4 | 39 s | 39 s |
+| job de 25/11, clip_01_src.mp4 | 82 s | **56 s** |
+| job de 25/11, clip_02_src.mp4 | 100 s | **46 s** |
+| job de 25/11, clip_03_src.mp4 | 94 s | 94 s |
+
+Três de cinco trechos baixados vieram com áudio truncado, incluindo dois do job de 25/11, que é
+anterior a qualquer mudança desta semana.
+
+**Como isso destrói o clipe:** em `render_clip`, o jump cut cruza os trechos de fala com
+`audio_active()`, que mede o áudio de verdade. Medindo o corte 1:
+
+- `keep` só pela fala: 9 trechos, **24,1 s** de 33,2 s — correto, há 89 palavras no trecho.
+- `audio_active()`: **1 trecho de 1,2 s** — correto também, porque depois de 5 s não existe áudio.
+- Depois da interseção: **1,13 s**. O clipe inteiro virou isso.
+
+O `audio_active` não está errado; ele está lendo um arquivo quebrado. A legenda acompanhou: o
+`clip_01.ass` ficou com 6 eventos, todos dentro dos primeiros 0,55 s.
+
+**Duas correções possíveis, nenhuma feita ainda:**
+
+1. Na origem: descobrir por que o `--download-sections` corta o áudio e corrigir o download
+   (talvez baixar áudio e vídeo em chamadas separadas e juntar, ou cortar de um arquivo maior).
+2. Como rede de proteção: conferir, depois do download, se o áudio tem a mesma duração do vídeo, e
+   avisar ou rebaixar o trecho quando não tiver. E, no jump cut, desconfiar do `audio_active`
+   quando ele derrubar o corte para uma fração pequena do que a fala indica — hoje um sinal
+   opcional está destruindo o clipe inteiro, o que vai contra a regra do projeto de que nada
+   opcional pode derrubar o trabalho.
+
+---
+
+## 2026-11-27 — Zoom ilegível no layout gamer
+
+O dono reclamou do corte de GTA: "muitas partes com zoom que ficou de um jeito que não dá para
+entender o que é". A investigação achou **uma** causa, não o zoom em geral.
+
+### O que estava certo
+
+- O layout `gamer` (webcam em cima, jogo embaixo) estava correto.
+- O recurso "webcam em tela cheia" (`_full_ranges`) também: disparou em 14,83–15,83 s e
+  23,33–25,67 s, e o quadro extraído do vídeo nesses instantes mostra o streamer realmente
+  ocupando a tela inteira. Detecção correta.
+
+### O que estava errado
+
+O close da reação. Em `_gamer_plan`, o `face_rect` é **um retângulo fixo**, calculado na posição
+média do rosto, e depois esticado para a tela toda. Neste vídeo:
+
+- webcam (`cam`): 474 x 304, no canto, em (1446, 315)
+- `face_rect` calculado: 404 x 720, em (1498, 178)
+
+O retângulo é 9:16, então vira um corredor alto: vai de y=178 a y=898, enquanto a webcam só ocupa
+de y=315 a y=619. Mais da metade da altura é jogo e parede, e os 404 px de largura ainda são
+ampliados para 1080 (2,7x). Resultado: um borrão.
+
+Pior: a reação de 24,0 s cai **dentro** de um trecho em que a webcam já está em tela cheia. Aí o
+rosto não está mais no canto, e o recorte fixo em x=1498 pegou a estante de DVDs do quarto.
+
+### Correção
+
+Duas travas, nenhuma delas mexe no zoom que funciona:
+
+1. `darkclip/reframe.py` — o `face_rect` só é criado se pelo menos **70%** da sua altura couber
+   dentro da webcam. Numa webcam pequena de canto não cabe, e o close é desligado
+   (`face_rect = None`); o render já sabe pular o efeito nesse caso.
+2. `darkclip/render.py` — janela de reação que se sobrepõe a um trecho de "webcam em tela cheia"
+   é descartada. Ali não há o que ampliar: a webcam já está grande.
+
+### Conferido
+
+Plano recalculado no vídeo real: `face_rect: None`, layout segue `gamer`, os dois trechos de
+webcam em tela cheia continuam valendo.
+
+O corte foi refeito com `pipeline.rerender`. Nas grades de quadros, os três quadros borrados
+(estante, chão, parede) sumiram; todos os quadros agora mostram rosto em cima e jogo embaixo, ou
+a webcam em tela cheia nos momentos certos.
+
+### O que NÃO foi feito
+
+O close de reação continua indisponível para vídeos de webcam pequena — ele foi desligado, não
+consertado. Para funcionar nesse caso seria preciso outra ideia (ampliar a webcam e preencher o
+resto com fundo desfocado, em vez de recortar um corredor 9:16 da tela cheia).
+
+---
+
+## 2026-11-27 — Frente 7: o Gemini olhou o clipe pronto e criticou a edição
+
+Pela primeira vez a conversa foi com **imagem**, não só com código. Foram enviadas duas imagens
+do clipe de GTA já renderizado:
+
+- `suspeitos.png`: três quadros lado a lado, em tamanho grande.
+- `denso.png`: grade com um quadro por segundo dos 21 s, na ordem.
+
+Mais os números reais do clipe: fonte 1920x1080, saída 1080x1920, webcam de 474x304 em (1446,315),
+faixa de cima com 690 px de 1920, rosto em 77% das amostras, 19 mudanças de cena, 6 jump cuts.
+
+### A) O que ele viu nas imagens
+
+Ele descreveu os quadros corretamente, incluindo coisas que eu não tinha apontado: a placa do jogo
+cortada na faixa de cima, o maço de cigarros da interface aparecendo ampliado, a barra amarela fina
+no rodapé, e os dois momentos de rosto em tela cheia com a estante do quarto ao fundo.
+
+Uma ressalva: ele disse que a webcam some nos quadros 14, 15 e 20 "onde aparece a água" e a
+interface do cigarro. Eu só conferi os quadros 3 e 9. Os outros são observação dele, não medição
+minha.
+
+### B) Críticas dele, da pior para a menos grave
+
+1. **Faixa de cima sem rosto.** O pior. O recorte de cima é fixo e não acompanha o rosto; quando o
+   streamer sai do canto ou a cena troca, aquela faixa vira um pedaço ampliado e sem sentido do
+   jogo, e o espectador vê a mesma cena duas vezes.
+2. **O gancho vermelho em cima da ação.** Três segundos e meio de um retângulo vermelho grande no
+   meio da tela, por cima do carro e do personagem, e logo abaixo da legenda: dois blocos de texto
+   pesados empilhados na abertura.
+3. **Legenda disputando espaço** com o gancho e passando sobre áreas claras do jogo.
+4. **A linha preta de separação some** nos trechos escuros, e os dois planos colam visualmente.
+5. **A barra de progresso amarela** é fina e de amarelo puro; em gameplay com interface embaixo,
+   parece defeito gráfico.
+6. **Transição seca** entre o layout dividido e o rosto em tela cheia.
+
+### Respostas às perguntas
+
+**Faixa de cima sem rosto — o que um editor humano faria:** esconder a webcam e voltar o jogo para
+a tela inteira nesses segundos, reabrindo quando o rosto voltar. Ele descartou as outras duas
+ideias com motivo: congelar o último quadro parece travamento do player, e deixar a faixa escura
+desperdiça 36% da tela sem informação.
+
+**Proporção:** 36% de webcam é demais quando a webcam original é pequena, porque ela é muito
+ampliada. Ele usaria **25% a 30%** para a webcam e 70% a 75% para o jogo (chute dele). No código
+isso é `GAMER_TOP = 0.36` em `reframe.py`.
+
+**O gancho:** atrapalha. Sem banner quando a própria fala de abertura já puxa o assunto — e neste
+clipe ela puxa: "CARA, TEM UNS 20 CARAS AQUI". Se usar texto, que seja de 2 a 4 palavras ligadas
+ao evento real, nunca um segundo bloco genérico empilhado.
+
+**Ferramentas que ele nomeou:** `crop` com coordenadas calculadas por quadro a partir do YuNet;
+`overlay` com `enable='between(t,...)'` para trocar de layout; `drawbox` de 4 a 8 px para a linha
+de separação; `drawbox` de 6 a 10 px com alpha para a barra de progresso; `xfade` nas trocas de
+enquadramento; `MarginV` e `\pos` no ASS para separar legenda e gancho.
+
+**O que um editor humano faria e o código não faz:** mover o recorte do jogo para acompanhar onde
+a ação está acontecendo, em vez de centralizar sempre; e julgar se o clipe termina no ápice ou se
+estica — ele apontou que este termina no cigarro, depois do ápice.
+
+### O que dá para aplicar, por ordem de retorno
+
+1. **Esconder a faixa da webcam quando não há rosto** e dar a tela toda ao jogo. É o pior erro, é o
+   que o editor humano faria, e o código já tem a peça pronta: o `_full_ranges` já sabe detectar
+   trechos por presença de rosto; falta o caminho inverso.
+2. **Não desenhar o gancho quando a abertura já tem fala forte.** Uma condição, não um recurso novo.
+3. **`GAMER_TOP` de 0,36 para 0,30.** Uma linha, mas muda todos os vídeos gamer: precisa ser olhado
+   em mais de um clipe antes de virar padrão.
+4. Linha de separação mais grossa e barra de progresso com alpha: cosmético, barato.
+
+Nada disso foi implementado ainda.
+
+### Os quatro consertos aplicados (2026-11-27)
+
+Tudo medido no mesmo clipe de GTA, refeito com `pipeline.rerender`.
+
+**1. Faixa de cima sem rosto → jogo em tela cheia** (o pior erro, e o mais trabalhoso)
+
+- `reframe.py`: além do `_full_ranges` (rosto grande), agora calcula os trechos **sem rosto nenhum**
+  com o `_lost_ranges` que já existia para o layout `track`, e guarda em `extra["noface"]`.
+- Novo `_subtrai()`: tira dos trechos sem rosto o que coincide com "webcam em tela cheia". Sem isso
+  os dois efeitos brigavam — no clipe real, (24,67–26,5) encostava em (23,33–25,67), e o último a
+  ser desenhado ganhava. Depois da subtração sobrou (25,67–26,5).
+- `render.py`: no filtro do layout gamer, mais uma saída do `split` recorta 606x1080 do centro,
+  amplia para 1080x1920 e entra por `overlay ... enable='between(t,…)'` nesses trechos.
+- Medido no clipe: três trechos sem rosto — (2,83–4,5), (16,67–18,0) e (25,67–26,5).
+
+**2. Gancho genérico quando a fala já abre forte**
+
+Duas funções novas em `hooks.py`:
+
+- `abre_forte(words)`: a fala começa em até 0,8 s e tem 4 ou mais palavras nos primeiros 2,5 s.
+- `especifico(texto, words)`: o gancho tem número, ou repete uma palavra de conteúdo dita nos
+  primeiros 4 s. "ROUBOU O CARRO EM 11 SEGUNDOS" é específico; "SEGURA A RESPIRAÇÃO ATÉ O FINAL",
+  não.
+
+Quando a fala abre forte e o gancho não é específico, não se desenha gancho nenhum.
+
+Duas tentativas antes de acertar, que valem registro:
+- A primeira versão só descartava o texto **pronto do catálogo**. Não adiantou: neste clipe quem
+  escreveu "Segura a respiração até o final" foi a **própria IA**, com `hook_type: espera`.
+- A segunda comparava o texto com a lista do catálogo, normalizando acento e caixa. Também não
+  pegou: a IA escreveu uma **variação**, não uma cópia ("ESPERA O FINAL…" é o texto pronto).
+- Só o critério de conteúdo — número ou palavra da própria fala — resolveu.
+
+**3. `GAMER_TOP` de 0,36 para 0,30**
+
+A faixa da webcam passou de 690 px para 576 px de 1920, e o jogo ganhou 114 px. Motivo: a webcam
+de origem tem 474 px de largura e era ampliada para 1080; com 30% ela estica menos e o jogo, que é
+o que o público veio ver, fica maior.
+
+**4. Linha de separação e barra de progresso**
+
+- Linha: de 6 px `black@0.8` para 10 px `black@0.95`. Ela sumia nos trechos escuros.
+- Barra: de 10 px de amarelo puro para 14 px com `@0.75` e `format=yuva420p`. Fina e opaca demais,
+  parecia defeito gráfico em cima do HUD.
+
+### Resultado
+
+Nas grades de quadros, antes e depois:
+
+- Sumiram os quadros em que a faixa de cima mostrava um pedaço ampliado e ilegível do jogo. Nos
+  segundos sem rosto a imagem agora é uma só, contínua.
+- O retângulo vermelho "SEGURA A RESPIRAÇÃO ATÉ O FINAL" não aparece mais: a abertura é
+  "CARA, TEM UNS 20 CARAS AQUI", que já puxa sozinha.
+- A divisão entre webcam e jogo é visível mesmo nas cenas escuras.
+- A webcam ocupa menos tela e o jogo, mais.
+
+### O que ainda não está bom
+
+O recorte do jogo em tela cheia é **centralizado e fixo**. Num dos segundos o carro fica meio para
+fora do quadro. É exatamente o que o Gemini apontou: um editor humano move o recorte para onde a
+ação está. Isso não foi feito.

@@ -215,6 +215,14 @@ def plan(video: Path, start: float, end: float, src_w: int, src_h: int, mode: st
                 fw = min(src_w, int(src_h * W / H * DISTANCE.get(distance, 1.0))) // 2 * 2
                 p.extra["full"] = [(a, b, _px(cx, src_w, fw)) for a, b, cx in full]
                 p.extra["full_w"] = fw
+            # trechos SEM rosto nenhum: a faixa de cima mostraria um pedaço ampliado do jogo, e o
+            # espectador veria a mesma cena duas vezes. Nesses segundos o jogo ocupa a tela toda.
+            sem = _lost_ranges([(s["t"], (s["faces"][0][0] if s["faces"] else None), s["cut"])
+                                for s in samples], dur)
+            sem = _subtrai(sem, [(a, b) for a, b, _ in full])   # tela cheia da webcam tem prioridade
+            if sem:
+                p.extra["noface"] = sem
+                p.extra["noface_w"] = min(src_w, int(src_h * W / H)) // 2 * 2
             return p
 
     # Duas pessoas afastadas na maior parte do tempo -> tela dividida
@@ -298,6 +306,27 @@ def _full_ranges(samples: list[dict], cam_size: float, dur: float,
     return out
 
 
+def _subtrai(trechos: list[tuple[float, float]], tirar: list[tuple[float, float]],
+             min_len: float = 0.8) -> list[tuple[float, float]]:
+    """Tira de `trechos` tudo o que cai dentro de `tirar`; sobras curtas demais são descartadas."""
+    out = []
+    for a, b in trechos:
+        pedacos = [(a, b)]
+        for ta, tb in tirar:
+            novos = []
+            for pa, pb in pedacos:
+                if tb <= pa or ta >= pb:
+                    novos.append((pa, pb))
+                    continue
+                if pa < ta:
+                    novos.append((pa, ta))
+                if tb < pb:
+                    novos.append((tb, pb))
+            pedacos = novos
+        out += [(round(pa, 2), round(pb, 2)) for pa, pb in pedacos if pb - pa >= min_len]
+    return out
+
+
 def _lost_ranges(pts: list[tuple[float, float | None, bool]], dur: float, min_len: float = 1.2,
                  gap: float = 0.8) -> list[tuple[float, float]]:
     """Trechos sem rosto com pelo menos `min_len` s (buracos menores que `gap` s são emendados)."""
@@ -317,7 +346,8 @@ def _lost_ranges(pts: list[tuple[float, float | None, bool]], dur: float, min_le
     return out
 
 
-GAMER_TOP = 0.36   # fração da altura para a webcam
+GAMER_TOP = 0.30   # fração da altura para a webcam (era 0,36: webcam pequena ampliada demais,
+                   # e o jogo, que é o que o público veio ver, ficava apertado)
 
 
 def _gamer_plan(src_w: int, src_h: int, cx: float, cy: float, size: float, ratio: float, shots: int) -> Plan:
@@ -343,8 +373,13 @@ def _gamer_plan(src_w: int, src_h: int, cx: float, cy: float, size: float, ratio
     rw, rh = max(2, rw // 2 * 2), max(2, rh // 2 * 2)
     rx = int(min(max(cx * src_w - rw / 2, 0), src_w - rw))
     ry = int(min(max(cy * src_h - rh * 0.38, 0), src_h - rh))
+    # O close da reação só vale se couber quase todo dentro da webcam. Numa webcam pequena de canto,
+    # esse retângulo 9:16 é um corredor alto que pega mais jogo e parede do que rosto, e ainda é
+    # ampliado para a tela toda: o resultado é um borrão que ninguém entende. Melhor não fazer.
+    dentro = max(0, min(ry + rh, cam_y + cam_h) - max(ry, cam_y)) / rh
+    face_rect = (rx, ry, rw, rh) if dentro >= 0.7 else None
     p.extra = {"cam": (cam_x, cam_y, cam_w, cam_h), "game": ((src_w - game_w) // 2, (src_h - game_h) // 2, game_w, game_h),
-               "top_h": top_h, "face_rect": (rx, ry, rw, rh)}
+               "top_h": top_h, "face_rect": face_rect}
     return p
 
 

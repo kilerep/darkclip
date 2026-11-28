@@ -267,10 +267,14 @@ def _layout_filter(plan, cmdfile: str | None) -> str:
         full = plan.extra.get("full") or []
         gamer = (f"[c]crop={cw}:{ch}:{cx}:{cy},scale={W}:{th},setsar=1[top];"
                  f"[g]crop={gw}:{gh}:{gx}:{gy},scale={W}:{H - th},setsar=1[bot];"
-                 f"[top][bot]vstack,drawbox=x=0:y={th - 3}:w={W}:h=6:color=black@0.8:t=fill")
+                 # a linha de 6 px sumia nos trechos escuros e os dois planos colavam
+                 f"[top][bot]vstack,drawbox=x=0:y={th - 5}:w={W}:h=10:color=black@0.95:t=fill")
         react = plan.extra.get("react") or []
         rect = plan.extra.get("face_rect")
-        outs = ["[c]", "[g]"] + (["[f]"] if full else []) + (["[r]"] if react and rect else [])
+        sem = plan.extra.get("noface") or []
+        nw = plan.extra.get("noface_w")
+        outs = (["[c]", "[g]"] + (["[f]"] if full else []) + (["[r]"] if react and rect else [])
+                + (["[n]"] if sem and nw else []))
         out_s, cur = f"{base},split={len(outs)}{''.join(outs)};{gamer}[gm]", "[gm]"
         if full:  # webcam em tela cheia em alguns trechos: nesses segundos mostra o rosto em tela cheia por cima
             fw = plan.extra["full_w"]
@@ -287,6 +291,11 @@ def _layout_filter(plan, cmdfile: str | None) -> str:
             out_s += (f";[r]crop={rw}:{rh}:{rx}:{ry},scale={W}:{H},setsar=1[rc];"
                       f"{cur}[rc]overlay=0:0:enable='{on_r}'[gm3]")
             cur = "[gm3]"
+        if sem and nw:  # 🎮 sem rosto na webcam: o jogo ocupa a tela toda, sem faixa de cima vazia
+            on_n = "+".join(f"between(t,{a:.2f},{b:.2f})" for a, b in sem)
+            out_s += (f";[n]crop={nw}:{sh}:{(sw - nw) // 2}:0,scale={W}:{H},setsar=1[jc];"
+                      f"{cur}[jc]overlay=0:0:enable='{on_n}'[gm4]")
+            cur = "[gm4]"
         return out_s + f";{cur}null[v]"
     if plan.layout == "track":
         sc = f"sendcmd=f={cmdfile}," if cmdfile else ""
@@ -402,7 +411,14 @@ def render_clip(video: Path, start: float, end: float, words: list[dict], out: P
             if pth and 0.6 <= ft <= final_dur - 0.9:
                 stick_items.append((round(ft, 2), pth))
     if react_zoom and reacts and plan.layout == "gamer":
-        plan.extra["react"] = [(max(0.0, r["t"] - 0.15), r["t"] + 1.35) for r in reacts]
+        # A reação corta para um retângulo FIXO, calculado na posição média do rosto. Quando a webcam
+        # já está em tela cheia, o rosto saiu daquele canto: o corte pegaria a parede ao lado dele.
+        # Nesses segundos não há o que ampliar — a webcam já está grande.
+        cheia = plan.extra.get("full") or []
+        janelas = [(max(0.0, r["t"] - 0.15), r["t"] + 1.35) for r in reacts]
+        janelas = [(a, b) for a, b in janelas if not any(a < fb and b > fa for fa, fb, _ in cheia)]
+        if janelas:
+            plan.extra["react"] = janelas
     vf = _layout_filter(plan, cmdfile)
     chain = []
     punch = ("+".join(f"0.2*between(t,{max(0.0, r['t'] - 0.1):.2f},{r['t'] + 1.4:.2f})" for r in reacts)
@@ -471,7 +487,9 @@ def render_clip(video: Path, start: float, end: float, words: list[dict], out: P
             cur = f"[sv{k}]"
             n_in += 1
     if progress:
-        vf += (f";color=c=0xE5FF00:s={W}x10:r={FPS}:d={final_dur:.3f}[pb];"
+        # 10 px de amarelo puro no rodapé passava por defeito gráfico em cima do HUD do jogo:
+        # mais grossa (14 px) para ler como barra, e com transparência para não brigar com a cena.
+        vf += (f";color=c=0xE5FF00@0.75:s={W}x14:r={FPS}:d={final_dur:.3f},format=yuva420p[pb];"
                f"{cur}[pb]overlay=x='-w+w*t/{final_dur:.3f}':y=H-h:eof_action=pass[vo]")
     else:
         vf += f";{cur}null[vo]"

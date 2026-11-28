@@ -529,7 +529,8 @@ def run_clip(job: Job) -> None:
                                         max_s=int(p.get("max_s", 58)), title=src["title"], niche=p.get("niche", ""),
                                         heatmap=src.get("heatmap"), energy=energy, chapters=src.get("chapters"),
                                         comments=comments, visual=visual, request=p.get("request", ""),
-                                        hook_mode=p.get("hook_mode") or "auto")
+                                        hook_mode=p.get("hook_mode") or "auto",
+                                        game=p.get("jogo", ""), on_game=job.step)
         clips = [c for c in clips if c["start"] >= a - 1 and c["end"] <= b + 15]
         job.data["engine"] = engine
         job.step(f"{label}: {len(clips)} trechos (motor: {engine})")

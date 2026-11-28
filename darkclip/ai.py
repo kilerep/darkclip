@@ -251,17 +251,35 @@ def _snap(segs: list[dict], start: float, end: float) -> tuple[float, float]:
 # ---------------------------------------------------------------- seleção de clipes
 def select_clips(segs: list[dict], n: int = 5, min_s: int = 20, max_s: int = 58, title: str = "",
                  niche: str = "", heatmap=None, energy=None, chapters=None, comments=None,
-                 visual=None, request: str = "", hook_mode: str = "auto") -> tuple[list[dict], str]:
+                 visual=None, request: str = "", hook_mode: str = "auto",
+                 game: str = "", on_game=None) -> tuple[list[dict], str]:
     """Escolhe os trechos combinando todos os sinais disponíveis.
 
     comments: análise de comments.analyze()  · visual: momentos do Gemini (gemini.find_moments)
     request : pedido do usuário ("ache a parte sobre X")
+    game    : 🎮 id do jogo (darkclip/jogos/<id>.md) quando o dono escolheu na mão; "" = descobrir
+              sozinho pelo título e pela fala; "nenhum" = não usar modo de jogo
+    on_game : função opcional para avisar qual jogo foi reconhecido (o pipeline usa job.step)
     """
     from . import comments as cm
     from . import signals
     global _NICHE
     _NICHE = niche or ""
-    ctx = dict(heatmap=heatmap, energy=energy, chapters=chapters, comments=comments, visual=visual, hook_mode=hook_mode)
+    jogo = None
+    try:            # 🎮 modo por jogo: nunca pode derrubar o job
+        from . import jogos
+        jogo = jogos.detectar(title, segs, game)
+        if jogo and on_game:
+            on_game(f"🎮 Modo {jogo['nome']} ligado ({jogo['motivo']}): usando o que o DarkClip "
+                    f"sabe sobre esse jogo para escolher os cortes")
+        elif game and game.lower() not in ("nenhum", "none", "off", "0") and on_game:
+            sabidos = ", ".join(j["id"] for j in jogos.listar()) or "nenhum"
+            on_game(f"🎮 Não existe arquivo para o jogo '{game}'. Seguindo sem modo de jogo. "
+                    f"Jogos que o DarkClip conhece: {sabidos} (arquivos em darkclip/jogos/)")
+    except Exception as e:
+        print(f"[ai] modo por jogo indisponível ({e}).")
+    ctx = dict(heatmap=heatmap, energy=energy, chapters=chapters, comments=comments, visual=visual,
+               hook_mode=hook_mode, game=jogo)
     clips, engine = None, "heuristica"
     if has_llm():
         name = llm_name()
@@ -302,6 +320,8 @@ def select_clips(segs: list[dict], n: int = 5, min_s: int = 20, max_s: int = 58,
                         "comments": talk, "visual": vis, **signals.text_signals(segs, c["start"], c["end"])}
         c["score"] = signals.blend_score(c["score"], heat, en, talk, vis, c["signals"].get("wpm"))
         c.setdefault("emphasis", [])
+        if jogo:
+            c["game"] = jogo["id"]
     clips.sort(key=lambda c: -c["score"])
     return clips, engine
 
@@ -310,6 +330,15 @@ def _hook_rules(mode: str | None) -> str:
     try:
         from . import hooks
         return hooks.prompt_rules(mode if mode not in (None, "auto", "nenhum") else None)
+    except Exception:
+        return ""
+
+
+def _game_block(jogo: dict | None) -> str:
+    """🎮 Conhecimento sobre o jogo do vídeo (darkclip/jogos/<id>.md), quando reconhecido."""
+    try:
+        from . import jogos
+        return jogos.bloco_prompt(jogo)
     except Exception:
         return ""
 
@@ -369,6 +398,7 @@ def _select_claude(segs, n, min_s, max_s, title, niche, ctx, request=""):
         "- grades: hook, flow, value, trend de 0 a 100; score = sua nota geral honesta (90+ só se excepcional);\n"
         "- use os tempos da transcrição; ordene do maior para o menor score.\n\n"
         + _hook_rules(ctx.get("hook_mode")) + _context_block(ctx) + _channel_prefs()
+        + _game_block(ctx.get("game"))
         + f"\n\nTRANSCRIÇÃO (segundos):\n{signals.annotate_transcript(segs, ctx.get('heatmap'), ctx.get('energy'), ctx.get('comments'), ctx.get('visual'))}"
     )
     data = _ask_json(prompt, CLIP_SCHEMA)

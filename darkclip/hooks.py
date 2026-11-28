@@ -59,6 +59,51 @@ def prompt_rules(forced: str | None = None) -> str:
     return txt
 
 
+def _chave(t: str) -> str:
+    import unicodedata
+    t = unicodedata.normalize("NFKD", (t or "").lower())
+    return re.sub(r"[^a-z0-9 ]", "", "".join(c for c in t if not unicodedata.combining(c))).strip()
+
+
+_PRONTOS = {_chave(x) for v in HOOK_TYPES.values() for x in v["textos"]}
+
+
+# Palavras que não dizem nada sobre o corte: não contam para decidir se o gancho é específico.
+_VAZIAS = {"a", "o", "as", "os", "um", "uma", "de", "do", "da", "dos", "das", "em", "no", "na",
+           "ao", "aos", "e", "ou", "que", "se", "por", "para", "pra", "com", "sem", "ate", "the",
+           "voce", "vc", "ele", "ela", "eles", "isso", "esse", "essa", "aqui", "ali", "la", "mais",
+           "muito", "ja", "nao", "sim", "vai", "ser", "ter", "tem", "eh", "final", "fim", "melhor",
+           "espera", "presta", "atencao", "adivinha", "acontece", "pula", "faria", "certo", "pov"}
+
+
+def especifico(texto: str, words: list[dict] | None) -> bool:
+    """O gancho fala DESTE corte, ou serviria para qualquer vídeo?
+
+    Vale se trouxer um número ou repetir uma palavra de conteúdo dita no começo do trecho.
+    "SEGURA A RESPIRAÇÃO ATÉ O FINAL" serve para qualquer clipe; "ROUBOU EM 11 SEGUNDOS", não.
+    """
+    k = _chave(texto)
+    if not k or k in _PRONTOS:
+        return False
+    if re.search(r"\d", k):
+        return True
+    do_gancho = {w for w in k.split() if len(w) > 3 and w not in _VAZIAS}
+    da_fala = {_chave(w.get("word", "")) for w in (words or []) if w.get("start", 9e9) <= 4.0}
+    da_fala = {w for w in da_fala if len(w) > 3 and w not in _VAZIAS}
+    return bool(do_gancho & da_fala)
+
+
+def abre_forte(words: list[dict] | None, inicio: float = 0.8, janela: float = 2.5, minimo: int = 4) -> bool:
+    """A fala já abre o corte sozinha? (começa quase no primeiro quadro e vem cheia de palavras)
+
+    Quando abre, um texto genérico no topo só empilha letra em cima da ação: o próprio áudio já
+    está dizendo do que se trata. Vale só para o texto pronto do catálogo; gancho escrito pela IA
+    para aquele corte continua valendo.
+    """
+    ws = [w for w in (words or []) if w.get("word", "").strip()]
+    return bool(ws) and ws[0]["start"] <= inicio and sum(w["start"] <= janela for w in ws) >= minimo
+
+
 def heuristic_text(hook_type: str, fallback: str = "", seed: float | None = None) -> str:
     texts = HOOK_TYPES.get(hook_type, {}).get("textos") or []
     return random.Random(seed).choice(texts) if texts else ("" if hook_type == "acao" else fallback)
@@ -91,7 +136,11 @@ def decide(clip: dict, mode: str, ending: str, loud, words, hook_on: bool = True
         out["teaser"] = teaser
         out["teaser_text"] = ai_hook if ai_type == "previa" and ai_hook else heuristic_text("previa", seed=seed)
     elif htype in ("pergunta", "espera", "choque", "pov"):
-        out["hook"] = ai_hook if ai_type == htype and ai_hook else heuristic_text(htype, ai_hook, seed=seed)
+        proprio = ai_hook if ai_type == htype and ai_hook else ""
+        if abre_forte(words) and not especifico(proprio, words):
+            out["hook"] = None       # a fala já abre o corte: texto genérico em cima só polui
+        else:
+            out["hook"] = proprio or heuristic_text(htype, ai_hook, seed=seed)
     elif htype == "texto":
         out["hook"] = ai_hook or None
     out["loop"] = ending == "loop" or (ending == "auto" and bool(clip.get("loop_ok")))
